@@ -15,21 +15,16 @@ function normalizeServerUrl(url) {
 }
 
 function getInitialServerUrl() {
-  const storedUrl = normalizeServerUrl(
-    localStorage.getItem('galleryServerUrl') || localStorage.getItem('serverUrl')
-  );
-
-  if (storedUrl && !/localhost|127\.0\.0\.1/i.test(storedUrl)) {
-    return storedUrl;
-  }
-
   return DEFAULT_SERVER_URL;
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-  // Keep one canonical key while still honoring older saved values.
-  localStorage.setItem('galleryServerUrl', serverUrl);
+  // Enforce a single remote endpoint across app restarts.
+  localStorage.setItem('galleryServerUrl', DEFAULT_SERVER_URL);
+  localStorage.setItem('serverUrl', DEFAULT_SERVER_URL);
+  serverUrl = DEFAULT_SERVER_URL;
+  setupFullscreenControls();
   setupPhotoClickNavigation();
   setupKeyboardShortcuts();
   loadRemoteSettings().then(() => {
@@ -47,6 +42,23 @@ function setupPhotoClickNavigation() {
   photoEl.addEventListener('click', () => {
     window.location.href = 'estimate.html';
   });
+}
+
+function setupFullscreenControls() {
+  const toggleButton = document.getElementById('fullscreen-toggle');
+  if (!toggleButton || !window.windowControls) return;
+
+  const syncLabel = async () => {
+    const isFullscreen = await window.windowControls.getFullscreenState();
+    toggleButton.textContent = isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen';
+  };
+
+  toggleButton.addEventListener('click', async () => {
+    await window.windowControls.toggleFullscreen();
+    await syncLabel();
+  });
+
+  syncLabel();
 }
 
 async function loadPhotos() {
@@ -165,16 +177,15 @@ function stopAutoRefresh() {
 
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
-    switch (e.key) {
-      case 'ArrowLeft':
-        previousPhoto();
-        break;
-      case 'ArrowRight':
-        nextPhoto();
-        break;
-      case 'r':
-        loadPhotos();
-        break;
+    if ((e.key === 'F11' || e.key.toLowerCase() === 'f') && window.windowControls) {
+      e.preventDefault();
+      window.windowControls.toggleFullscreen().then((isFullscreen) => {
+        const toggleButton = document.getElementById('fullscreen-toggle');
+        if (toggleButton) {
+          toggleButton.textContent = isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen';
+        }
+      });
+      return;
     }
   });
 }

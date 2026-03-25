@@ -159,6 +159,51 @@ section h2 {
   border-color: #0052a3;
 }
 
+.upload-area.has-files {
+  border-style: solid;
+  background: #eafaf0;
+  border-color: #1f9d57;
+}
+
+.selected-files {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.selected-files-summary {
+  font-size: 0.9rem;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.selected-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.selected-files-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.selected-files-list li:last-child {
+  border-bottom: none;
+}
+
+.selected-file-size {
+  color: #666;
+}
+
 #photo-list {
   display: table-row-group;
 }

@@ -12,21 +12,15 @@ function normalizeServerUrl(url) {
 }
 
 function getInitialServerUrl() {
-  const storedUrl = normalizeServerUrl(
-    localStorage.getItem('galleryServerUrl') || localStorage.getItem('serverUrl')
-  );
-
-  if (storedUrl && !/localhost|127\.0\.0\.1/i.test(storedUrl)) {
-    return storedUrl;
-  }
-
   return DEFAULT_SERVER_URL;
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-  // Keep one canonical key while still honoring older saved values.
-  localStorage.setItem('galleryServerUrl', serverUrl);
+  // Enforce a single remote endpoint across app restarts.
+  localStorage.setItem('galleryServerUrl', DEFAULT_SERVER_URL);
+  localStorage.setItem('serverUrl', DEFAULT_SERVER_URL);
+  serverUrl = DEFAULT_SERVER_URL;
   setupNavigation();
   setupUploadArea();
   setupSettings();
@@ -87,13 +81,38 @@ function setupUploadArea() {
 
 function handleFiles(files) {
   const fileInput = document.getElementById('file-input');
+  const uploadArea = document.getElementById('upload-area');
+  const summaryEl = document.getElementById('selected-files-summary');
+  const listEl = document.getElementById('selected-files-list');
+  const selectedFiles = Array.from(files || []);
+
   fileInput.files = files;
-  console.log(`${files.length} files selected for upload`);
+
+  if (selectedFiles.length === 0) {
+    uploadArea.classList.remove('has-files');
+    summaryEl.textContent = 'No files selected yet.';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  uploadArea.classList.add('has-files');
+  summaryEl.textContent = `${selectedFiles.length} file(s) staged and ready to upload.`;
+  listEl.innerHTML = selectedFiles.map((file) => `
+    <li>
+      <span>${file.name}</span>
+      <span class="selected-file-size">${formatFileSize(file.size)}</span>
+    </li>
+  `).join('');
+
+  console.log(`${selectedFiles.length} files selected for upload`);
 }
 
 async function uploadFiles() {
   const fileInput = document.getElementById('file-input');
   const files = fileInput.files;
+  const uploadArea = document.getElementById('upload-area');
+  const summaryEl = document.getElementById('selected-files-summary');
+  const listEl = document.getElementById('selected-files-list');
 
   if (files.length === 0) {
     alert('Please select files to upload');
@@ -136,6 +155,11 @@ async function uploadFiles() {
   }
 
   setTimeout(loadPhotos, 1000);
+
+  fileInput.value = '';
+  uploadArea.classList.remove('has-files');
+  summaryEl.textContent = 'No files selected yet.';
+  listEl.innerHTML = '';
 }
 
 async function loadPhotos() {
@@ -143,13 +167,8 @@ async function loadPhotos() {
     const response = await fetch(`${serverUrl}/api/photos`);
     if (response.ok) {
       allPhotos = await response.json();
-      
-      // Initialize display order if not set
-      allPhotos.forEach((photo, index) => {
-        if (!(photo.id in displayOrder)) {
-          displayOrder[photo.id] = index;
-        }
-      });
+
+      normalizeDisplayOrder(allPhotos);
       
       displayPhotos(allPhotos);
       document.getElementById('photo-count').textContent = allPhotos.length;
@@ -172,6 +191,29 @@ function formatFileSize(bytes) {
 function formatDate(isoDate) {
   if (!isoDate) return '—';
   return new Date(isoDate).toLocaleDateString();
+}
+
+function normalizeDisplayOrder(photos) {
+  const byId = new Map(photos.map(photo => [photo.id, photo]));
+
+  // Remove stale order entries for photos that were deleted.
+  Object.keys(displayOrder).forEach((id) => {
+    if (!byId.has(id)) {
+      delete displayOrder[id];
+    }
+  });
+
+  // Rebuild to contiguous values (0..n-1), preserving prior sequence when possible.
+  const sorted = [...photos].sort((a, b) => {
+    const orderA = displayOrder[a.id] ?? a.order ?? Number.MAX_SAFE_INTEGER;
+    const orderB = displayOrder[b.id] ?? b.order ?? Number.MAX_SAFE_INTEGER;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.name.localeCompare(b.name);
+  });
+
+  sorted.forEach((photo, index) => {
+    displayOrder[photo.id] = index;
+  });
 }
 
 function displayPhotos(photos) {
@@ -239,15 +281,16 @@ function setupSettings() {
   const rotationIntervalInput = document.getElementById('rotation-interval');
   const saveBtn = document.getElementById('save-settings-btn');
 
-  serverUrlInput.value = serverUrl;
+  serverUrlInput.value = DEFAULT_SERVER_URL;
+  serverUrlInput.readOnly = true;
   rotationIntervalInput.value = rotationInterval;
 
   saveBtn.addEventListener('click', async () => {
-    serverUrl = normalizeServerUrl(serverUrlInput.value);
+    serverUrl = DEFAULT_SERVER_URL;
     rotationInterval = rotationIntervalInput.value;
 
-    localStorage.setItem('galleryServerUrl', serverUrl);
-    localStorage.setItem('serverUrl', serverUrl);
+    localStorage.setItem('galleryServerUrl', DEFAULT_SERVER_URL);
+    localStorage.setItem('serverUrl', DEFAULT_SERVER_URL);
     localStorage.setItem('rotationInterval', rotationInterval);
 
     try {
