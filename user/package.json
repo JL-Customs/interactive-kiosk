@@ -1,0 +1,14 @@
+{
+  "name": "jl-customs-photo-gallery",
+  "version": "1.0.0",
+  "description": "Photo gallery display app that rotates through uploaded photos",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "devDependencies": {
+    "electron": "^27.0.0"
+  },
+  "dependencies": {}
+}

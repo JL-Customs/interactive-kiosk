@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JL Customs - Admin Portal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Admin Portal</h1>
+    </header>
+
+    <nav class="navbar">
+      <button class="nav-btn active" data-section="dashboard">Dashboard</button>
+      <button class="nav-btn" data-section="upload">Upload Photos</button>
+      <button class="nav-btn" data-section="manage">Manage Gallery</button>
+      <button class="nav-btn" data-section="settings">Settings</button>
+    </nav>
+
+    <main id="content">
+      <!-- Dashboard Section -->
+      <section id="dashboard" class="section active">
+        <h2>Dashboard</h2>
+        <div class="stats">
+          <div class="stat-card">
+            <h3>Total Photos</h3>
+            <p id="photo-count" class="stat-number">0</p>
+          </div>
+          <div class="stat-card">
+            <h3>Server Status</h3>
+            <p id="server-status" class="stat-number status-connecting">Connecting...</p>
+          </div>
+          <div class="stat-card">
+            <h3>Gallery Status</h3>
+            <p id="gallery-status" class="stat-number status-online">Online</p>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="refresh-btn">Refresh Data</button>
+      </section>
+
+      <!-- Upload Section -->
+      <section id="upload" class="section">
+        <h2>Upload Photos</h2>
+        <div class="upload-area" id="upload-area">
+          <p>Drag and drop photos here or click to select</p>
+          <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+        </div>
+        <div id="upload-progress"></div>
+        <button class="btn btn-primary" id="upload-btn">Upload Selected</button>
+      </section>
+
+      <!-- Manage Section -->
+      <section id="manage" class="section">
+        <h2>Manage Gallery</h2>
+        <div class="manage-controls">
+          <button class="btn btn-primary" id="select-all-btn">Select All</button>
+          <button class="btn btn-danger" id="delete-selected-btn" disabled>Delete Selected</button>
+          <button class="btn btn-primary" id="update-order-btn" disabled>Update Order</button>
+        </div>
+        <table class="photo-table" id="photo-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="select-all-checkbox"></th>
+              <th>Preview</th>
+              <th>Name</th>
+              <th>Size</th>
+              <th>Uploaded</th>
+              <th>Active</th>
+              <th>Order</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="photo-list">
+            <tr><td colspan="8" style="text-align: center; padding: 2rem;">No photos available</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Settings Section -->
+      <section id="settings" class="section">
+        <h2>Settings</h2>
+        <div class="settings-form">
+          <div class="form-group">
+            <label for="server-url">Server URL:</label>
+            <input type="text" id="server-url" placeholder="https://your-server.onrender.com" />
+          </div>
+          <div class="form-group">
+            <label for="rotation-interval">Photo Rotation Interval (seconds):</label>
+            <input type="number" id="rotation-interval" value="5" min="1" />
+          </div>
+          <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
