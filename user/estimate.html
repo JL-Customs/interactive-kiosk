@@ -335,7 +335,6 @@
         <button class="modal-close" id="modal-close">&times;</button>
       </div>
 
-      <!-- Step 1: Review -->
       <div id="step-review">
         <div class="modal-body" id="modal-body"></div>
         <div class="modal-footer">
@@ -344,7 +343,6 @@
         </div>
       </div>
 
-      <!-- Step 2: Email input -->
       <div id="step-email" style="display:none;">
         <div class="modal-body">
           <p class="email-prompt">Enter your email address and we'll send your estimate.</p>
@@ -357,7 +355,6 @@
         </div>
       </div>
 
-      <!-- Step 3: Confirmation -->
       <div id="step-confirm" style="display:none;">
         <div class="modal-body" style="text-align:center; padding: 40px 24px;">
           <div class="confirm-icon">&#10003;</div>
@@ -375,7 +372,7 @@
 
     const OPTIONS = [
       { label: 'Full Vehicle Wrap',      price: 3500 },
-      { label: 'LED Light Bar – Front',  price:  600 },
+      { label: 'LED Light Bar - Front',  price:  600 },
       { label: 'Custom Wheels (set of 4)', price: 1200 },
     ];
 
@@ -509,7 +506,6 @@
       }
     });
 
-    // Inactivity — redirect to gallery after 1 minute
     const TIMEOUT_MS = 60 * 1000 * 3;
     let inactivityTimer;
 

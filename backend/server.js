@@ -326,7 +326,7 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
   const html = `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#222;">
       <h2 style="background:#c0392b;color:#fff;padding:20px 24px;margin:0;border-radius:8px 8px 0 0;">
-        JL Customs – Your Estimate
+        JL Customs - Your Estimate
       </h2>
       <div style="border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;padding:24px;">
         <table style="width:100%;border-collapse:collapse;">
