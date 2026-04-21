@@ -306,6 +306,26 @@
       color: #ccc;
       line-height: 1.6;
     }
+
+    @media print {
+      body > * { display: none !important; }
+      #print-area { display: block !important; }
+    }
+
+    #print-area {
+      display: none;
+      font-family: sans-serif;
+      color: #000;
+      padding: 40px;
+    }
+
+    #print-area h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    #print-area .print-date { color: #666; margin-bottom: 24px; font-size: 0.9rem; }
+    #print-area table { width: 100%; border-collapse: collapse; }
+    #print-area th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #000; }
+    #print-area td { padding: 8px 12px; border-bottom: 1px solid #ccc; }
+    #print-area td:last-child, #print-area th:last-child { text-align: right; }
+    #print-area .print-total { font-weight: bold; font-size: 1.1rem; }
   </style>
 </head>
 <body>
@@ -328,6 +348,8 @@
     <button id="checkout-btn">Review Estimate</button>
   </footer>
 
+  <div id="print-area"></div>
+
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal">
       <div class="modal-header">
@@ -337,9 +359,12 @@
 
       <div id="step-review">
         <div class="modal-body" id="modal-body"></div>
-        <div class="modal-footer">
-          <span class="modal-grand-total" id="modal-grand-total"></span>
-          <button class="btn-primary" id="btn-continue">Continue &#8594;</button>
+        <div class="modal-footer" style="flex-direction:column; gap:12px; align-items:stretch;">
+          <span class="modal-grand-total" id="modal-grand-total" style="text-align:center;"></span>
+          <div style="display:flex; gap:12px;">
+            <button class="btn-back" id="btn-print" style="flex:1; text-align:center;">&#128438; Print</button>
+            <button class="btn-primary" id="btn-continue" style="flex:1;">&#9993; Email</button>
+          </div>
         </div>
       </div>
 
@@ -446,6 +471,27 @@
     });
 
     document.getElementById('btn-continue').addEventListener('click', () => showStep('email'));
+
+    document.getElementById('btn-print').addEventListener('click', () => {
+      const checked = getChecked();
+      const total = checked.reduce((sum, cb) => sum + Number(cb.dataset.price), 0);
+      const rows = checked.map((cb) => {
+        const label = cb.closest('.option').querySelector('.option-label').textContent;
+        return `<tr><td>${label}</td><td>$${Number(cb.dataset.price).toLocaleString('en-US')}</td></tr>`;
+      }).join('');
+
+      document.getElementById('print-area').innerHTML = `
+        <h1>JL Customs — Estimate</h1>
+        <div class="print-date">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        <table>
+          <thead><tr><th>Item</th><th>Price</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="2">No items selected</td></tr>'}</tbody>
+          <tfoot><tr><td class="print-total">Estimated Total</td><td class="print-total">$${total.toLocaleString('en-US')}</td></tr></tfoot>
+        </table>
+      `;
+      closeModal();
+      window.print();
+    });
     document.getElementById('btn-back-step').addEventListener('click', () => showStep('review'));
     document.getElementById('btn-done').addEventListener('click', closeModal);
 
@@ -479,7 +525,7 @@
 
         if (res.ok) {
           document.getElementById('confirm-msg').textContent =
-            `Your estimate has been sent to ${email}. We'll be in touch soon!`;
+            `Your estimate has been sent to ${email}. Thank you!`;
           showStep('confirm');
         } else {
           const data = await res.json().catch(() => ({}));
