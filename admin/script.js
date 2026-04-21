@@ -1,4 +1,4 @@
-// Admin Portal Script
+// Admin Dashboard Script
 
 const DEFAULT_SERVER_URL = 'https://interactive-monitor-thing.onrender.com';
 let serverUrl = getInitialServerUrl();
@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupNavigation();
   setupUploadArea();
   setupSettings();
+  loadSettingsFromServer();
   setupManageGallery();
   loadPhotos();
   checkServerStatus();
@@ -167,17 +168,37 @@ async function loadPhotos() {
     const response = await fetch(`${serverUrl}/api/photos`);
     if (response.ok) {
       allPhotos = await response.json();
-
+      localStorage.setItem('cachedPhotos', JSON.stringify(allPhotos));
       normalizeDisplayOrder(allPhotos);
-      
       displayPhotos(allPhotos);
       document.getElementById('photo-count').textContent = allPhotos.length;
       selectedPhotos.clear();
       document.getElementById('select-all-checkbox').checked = false;
       updateButtonStates();
+      return;
     }
   } catch (error) {
     console.error('Error loading photos:', error);
+  }
+
+  // Server unreachable — fall back to localStorage cache
+  loadCachedPhotosAdmin();
+}
+
+function loadCachedPhotosAdmin() {
+  const raw = localStorage.getItem('cachedPhotos');
+  if (!raw) return;
+  try {
+    allPhotos = JSON.parse(raw);
+    console.warn('Server offline — showing cached photo data. Changes cannot be saved until the server is back.');
+    normalizeDisplayOrder(allPhotos);
+    displayPhotos(allPhotos);
+    document.getElementById('photo-count').textContent = `${allPhotos.length} (cached)`;
+    selectedPhotos.clear();
+    document.getElementById('select-all-checkbox').checked = false;
+    updateButtonStates();
+  } catch (err) {
+    console.error('Error loading cached photos:', err);
   }
 }
 
@@ -257,6 +278,22 @@ function displayPhotos(photos) {
   });
 }
 
+
+async function loadSettingsFromServer() {
+  try {
+    const response = await fetch(`${serverUrl}/api/settings`);
+    if (!response.ok) return;
+    const data = await response.json();
+    const interval = Number(data.rotationInterval);
+    if (Number.isFinite(interval) && interval >= 1) {
+      rotationInterval = interval;
+      localStorage.setItem('rotationInterval', String(interval));
+      document.getElementById('rotation-interval').value = interval;
+    }
+  } catch {
+    console.warn('Server offline — using cached settings.');
+  }
+}
 
 async function checkServerStatus() {
   try {

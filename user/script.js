@@ -40,7 +40,7 @@ function setupPhotoClickNavigation() {
   if (!photoEl) return;
 
   photoEl.addEventListener('click', () => {
-    window.location.href = 'estimate.html';
+    window.location.href = 'home.html';
   });
 }
 
@@ -66,35 +66,86 @@ async function loadPhotos() {
     const response = await fetch(`${serverUrl}/api/photos`);
     if (response.ok) {
       const newPhotos = await response.json();
-      
+
       // Check if photos changed
       if (newPhotos.length !== lastPhotoCount) {
         console.log(`Photo count changed: ${lastPhotoCount} -> ${newPhotos.length}`);
         lastPhotoCount = newPhotos.length;
       }
-      
+
       // Sort by order property if available and filter inactive photos
       photos = newPhotos
-        .filter(p => p.active !== false) // Show photos that are active or don't have active property set
+        .filter(p => p.active !== false)
         .sort((a, b) => {
           const orderA = a.order ?? 999;
           const orderB = b.order ?? 999;
           return orderA - orderB;
         });
-      
+
+      // Persist to disk cache in the background
+      cachePhotoData(newPhotos);
+
       if (photos.length > 0) {
-        // Keep current index in bounds
         if (currentIndex >= photos.length) {
           currentIndex = 0;
         }
         displayPhoto();
+        if (!autoPlayTimer) startAutoPlay();
       }
       return photos;
     }
   } catch (error) {
     console.error('Error loading photos:', error);
   }
-  return [];
+
+  // Server unreachable — fall back to locally cached photos
+  return loadCachedPhotos();
+}
+
+async function cachePhotoData(photoList) {
+  if (!window.photoCache) return;
+  try {
+    await window.photoCache.saveMetadata(photoList);
+    for (const photo of photoList) {
+      if (photo.filename) {
+        window.photoCache.downloadPhoto(photo.url, photo.filename).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error('Error caching photos:', err);
+  }
+}
+
+async function loadCachedPhotos() {
+  if (!window.photoCache) return [];
+  try {
+    const cached = await window.photoCache.loadMetadata();
+    if (!cached || cached.length === 0) return [];
+
+    const resolved = await Promise.all(
+      cached
+        .filter(p => p.active !== false)
+        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+        .map(async (photo) => {
+          if (photo.filename) {
+            const localUrl = await window.photoCache.getLocalPath(photo.filename);
+            if (localUrl) return { ...photo, url: localUrl };
+          }
+          return photo;
+        })
+    );
+
+    photos = resolved;
+    if (photos.length > 0) {
+      if (currentIndex >= photos.length) currentIndex = 0;
+      displayPhoto();
+      if (!autoPlayTimer) startAutoPlay();
+    }
+    return photos;
+  } catch (err) {
+    console.error('Error loading cached photos:', err);
+    return [];
+  }
 }
 
 async function loadRemoteSettings() {
@@ -109,8 +160,8 @@ async function loadRemoteSettings() {
       localStorage.setItem('galleryInterval', String(rotationInterval));
       resetAutoPlay();
     }
-  } catch (error) {
-    console.error('Error loading settings:', error);
+  } catch {
+    console.warn('Server offline — using cached rotation interval.');
   }
 }
 
@@ -124,7 +175,6 @@ function nextPhoto() {
   if (photos.length === 0) return;
   currentIndex = (currentIndex + 1) % photos.length;
   displayPhoto();
-  resetAutoPlay();
 }
 
 function previousPhoto() {

@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -290,6 +291,77 @@ app.patch('/api/photos/:id', express.json(), (req, res) => {
     res.json({ success: true, photo });
   } else {
     res.status(400).json({ error: 'No update fields provided' });
+  }
+});
+
+/**
+ * Send estimate via email
+ */
+app.post('/api/send-estimate', express.json(), async (req, res) => {
+  const { email, items, total } = req.body;
+
+  if (!email || !Array.isArray(items)) {
+    return res.status(400).json({ error: 'email and items are required' });
+  }
+
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    return res.status(503).json({ error: 'Email is not configured on the server.' });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT) || 587,
+    secure: Number(SMTP_PORT) === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+
+  const rows = items.map(i =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #ddd;">${i.label}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #ddd;text-align:right;">$${Number(i.price).toLocaleString('en-US')}</td>
+    </tr>`
+  ).join('');
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#222;">
+      <h2 style="background:#c0392b;color:#fff;padding:20px 24px;margin:0;border-radius:8px 8px 0 0;">
+        JL Customs – Your Estimate
+      </h2>
+      <div style="border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;padding:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f5f5f5;">
+              <th style="padding:8px 12px;text-align:left;">Item</th>
+              <th style="padding:8px 12px;text-align:right;">Price</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td style="padding:12px;font-weight:bold;">Estimated Total</td>
+              <td style="padding:12px;font-weight:bold;text-align:right;">$${Number(total).toLocaleString('en-US')}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <p style="margin-top:20px;color:#666;font-size:0.9rem;">
+          This is an estimate only. Final pricing may vary. Contact us to confirm your order.
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: SMTP_FROM || SMTP_USER,
+      to: email,
+      subject: 'Your JL Customs Estimate',
+      html,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Email send error:', err);
+    res.status(500).json({ error: 'Failed to send email. Please try again.' });
   }
 });
 
