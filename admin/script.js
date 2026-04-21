@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupUploadArea();
   setupSettings();
   loadSettingsFromServer();
+  pushLocalSettingsToServer();
   setupManageGallery();
   loadPhotos();
   checkServerStatus();
@@ -145,6 +146,8 @@ async function uploadFiles() {
 
       if (response.ok) {
         progressItem.style.opacity = '0.5';
+        const { photo } = await response.json();
+        await savePhotoToLocalStore(file, photo);
         console.log(`uploaded: ${file.name}`);
       } else {
         progressItem.innerHTML += ' - Error';
@@ -169,6 +172,18 @@ async function loadPhotos() {
     if (response.ok) {
       allPhotos = await response.json();
       localStorage.setItem('cachedPhotos', JSON.stringify(allPhotos));
+
+      // Server is empty but local store has photos — re-upload
+      if (allPhotos.length === 0 && window.localStore) {
+        const localPhotos = await window.localStore.loadMetadata();
+        if (localPhotos.length > 0) {
+          console.log(`Server empty, re-uploading ${localPhotos.length} photos from local store...`);
+          await syncLocalStoreToServer(localPhotos);
+          await loadPhotos(); // reload after re-upload
+          return;
+        }
+      }
+
       normalizeDisplayOrder(allPhotos);
       displayPhotos(allPhotos);
       document.getElementById('photo-count').textContent = allPhotos.length;
@@ -183,6 +198,97 @@ async function loadPhotos() {
 
   // Server unreachable — fall back to localStorage cache
   loadCachedPhotosAdmin();
+}
+
+async function savePhotoToLocalStore(file, serverPhoto) {
+  if (!window.localStore) return;
+  try {
+    const localId = crypto.randomUUID();
+    const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
+    const localFilename = `${localId}${ext}`;
+    const buffer = await file.arrayBuffer();
+    await window.localStore.savePhoto(buffer, localFilename, {
+      localId,
+      localFilename,
+      serverId: serverPhoto.id,
+      serverFilename: serverPhoto.filename,
+      name: serverPhoto.name,
+      size: serverPhoto.size,
+      uploadedAt: serverPhoto.uploadedAt,
+      active: serverPhoto.active,
+      order: serverPhoto.order,
+    });
+  } catch (err) {
+    console.error('Failed to save photo to local store:', err);
+  }
+}
+
+async function syncLocalStoreToServer(localPhotos) {
+  if (!window.localStore) return;
+
+  const sorted = [...localPhotos].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  const updatedLocals = [];
+
+  for (const local of sorted) {
+    try {
+      const fileData = await window.localStore.getFileData(local.localFilename);
+      if (!fileData) { console.warn(`Local file missing for ${local.name}, skipping`); continue; }
+
+      const blob = new Blob([fileData.buffer]);
+      const formData = new FormData();
+      formData.append('file', blob, local.name);
+
+      const res = await fetch(`${serverUrl}/api/upload`, { method: 'POST', body: formData });
+      if (!res.ok) continue;
+
+      const { photo: serverPhoto } = await res.json();
+
+      // Restore active state if it was false
+      if (local.active === false) {
+        await fetch(`${serverUrl}/api/photos/${serverPhoto.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: false }),
+        }).catch(() => {});
+      }
+
+      updatedLocals.push({ ...local, serverId: serverPhoto.id, serverFilename: serverPhoto.filename });
+    } catch (err) {
+      console.error(`Failed to re-upload ${local.name}:`, err);
+    }
+  }
+
+  // Restore order on server
+  if (updatedLocals.length > 1) {
+    const orderArray = updatedLocals.map(p => p.serverId);
+    await fetch(`${serverUrl}/api/photos/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: orderArray }),
+    }).catch(() => {});
+  }
+
+  // Update local metadata with new server IDs
+  if (updatedLocals.length > 0) {
+    await window.localStore.saveMetadata(updatedLocals);
+  }
+
+  console.log(`Re-uploaded ${updatedLocals.length} / ${sorted.length} photos`);
+}
+
+async function pushLocalSettingsToServer() {
+  if (!window.localStore) return;
+  try {
+    const settings = await window.localStore.loadSettings();
+    if (!settings) return;
+    await fetch(`${serverUrl}/api/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+  } catch {
+    // server offline — silently skip, will push next time
+  }
 }
 
 function loadCachedPhotosAdmin() {
@@ -330,6 +436,10 @@ function setupSettings() {
     localStorage.setItem('serverUrl', DEFAULT_SERVER_URL);
     localStorage.setItem('rotationInterval', rotationInterval);
 
+    if (window.localStore) {
+      await window.localStore.saveSettings({ rotationInterval: Number(rotationInterval) }).catch(() => {});
+    }
+
     try {
       await fetch(`${serverUrl}/api/settings`, {
         method: 'PATCH',
@@ -414,6 +524,7 @@ function setupActiveToggle(photoId) {
         });
         if (response.ok) {
           console.log(`Photo ${photoId} active status updated to: ${isActive}`);
+          updateLocalStoreMeta(photoId, { active: isActive });
         } else {
           alert('Failed to update photo status');
           e.target.checked = !isActive; // Revert toggle
@@ -434,6 +545,7 @@ async function deleteSelectedPhotos() {
   for (const photoId of selectedPhotos) {
     try {
       await fetch(`${serverUrl}/api/photos/${photoId}`, { method: 'DELETE' });
+      await deleteFromLocalStore(photoId);
     } catch (error) {
       console.error(`Error deleting photo ${photoId}:`, error);
     }
@@ -445,12 +557,23 @@ async function deleteSelectedPhotos() {
 
 async function deletePhotoSingle(photoId) {
   if (!confirm('Delete this photo?')) return;
-  
   try {
     await fetch(`${serverUrl}/api/photos/${photoId}`, { method: 'DELETE' });
+    await deleteFromLocalStore(photoId);
     loadPhotos();
   } catch (error) {
     console.error('Error deleting photo:', error);
+  }
+}
+
+async function deleteFromLocalStore(serverId) {
+  if (!window.localStore) return;
+  try {
+    const locals = await window.localStore.loadMetadata();
+    const match = locals.find(p => p.serverId === serverId);
+    if (match) await window.localStore.deletePhoto(match.localId);
+  } catch (err) {
+    console.error('Failed to delete from local store:', err);
   }
 }
 
@@ -485,11 +608,27 @@ async function updatePhotoOrder() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order: orderArray })
     });
+    // Sync new order values to local store
+    orderArray.forEach((serverId, index) => updateLocalStoreMeta(serverId, { order: index }));
     alert('Photo order updated!');
     loadPhotos();
   } catch (error) {
     console.error('Error updating photo order:', error);
     alert('Failed to update photo order');
+  }
+}
+
+async function updateLocalStoreMeta(serverId, changes) {
+  if (!window.localStore) return;
+  try {
+    const locals = await window.localStore.loadMetadata();
+    const idx = locals.findIndex(p => p.serverId === serverId);
+    if (idx >= 0) {
+      locals[idx] = { ...locals[idx], ...changes };
+      await window.localStore.saveMetadata(locals);
+    }
+  } catch (err) {
+    console.error('Failed to update local store metadata:', err);
   }
 }
 

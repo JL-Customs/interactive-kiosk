@@ -27,11 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
   setupFullscreenControls();
   setupPhotoClickNavigation();
   setupKeyboardShortcuts();
-  loadRemoteSettings().then(() => {
-    loadPhotos().then(() => {
-      startAutoPlay();
-      startAutoRefresh();
-    });
+  loadRemoteSettings().then(async () => {
+    // Show cached photos immediately so the kiosk is never blank on startup
+    await loadCachedPhotos();
+    startAutoPlay();
+    startAutoRefresh();
+    // Refresh from server in background; updates display + cache if anything changed
+    loadPhotos();
   });
 });
 
@@ -95,11 +97,8 @@ async function loadPhotos() {
       return photos;
     }
   } catch (error) {
-    console.error('Error loading photos:', error);
+    console.warn('Could not reach server, showing cached photos.');
   }
-
-  // Server unreachable — fall back to locally cached photos
-  return loadCachedPhotos();
 }
 
 async function cachePhotoData(photoList) {
