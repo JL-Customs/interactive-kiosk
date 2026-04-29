@@ -110,6 +110,21 @@
       white-space: nowrap;
     }
 
+    .category-heading {
+      font-size: 0.8rem;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #c0392b;
+      padding: 18px 4px 6px;
+      border-bottom: 1px solid #2a2a2a;
+      margin-bottom: 4px;
+    }
+
+    .category-heading:first-child {
+      padding-top: 4px;
+    }
+
     /* ── Footer ── */
     footer {
       display: flex;
@@ -394,54 +409,86 @@
 
   <script>
     const serverUrl = 'https://interactive-monitor-thing.onrender.com';
-
-    const FALLBACK_OPTIONS = [
-      { label: 'Full Vehicle Wrap',        price: 3500 },
-      { label: 'LED Light Bar - Front',    price:  600 },
-      { label: 'Custom Wheels (set of 4)', price: 1200 },
-    ];
+    const company = new URLSearchParams(window.location.search).get('company') || 'Company_1';
 
     const fmt = (n) => '$' + n.toLocaleString('en-US');
 
-    function buildOptions(options) {
+    // Build flat checkbox list from either a flat [{label,price}] or
+    // hierarchical [{category, items:[{label,price}]}] array
+    function buildOptions(data) {
       const list = document.getElementById('options-list');
       list.innerHTML = '';
-      options.forEach((opt, i) => {
-        const id = `opt-${i}`;
-        const div = document.createElement('label');
-        div.className = 'option';
-        div.htmlFor = id;
-        div.innerHTML = `
-          <input type="checkbox" id="${id}" data-price="${opt.price}">
-          <span class="option-label">${opt.label}</span>
-          <span class="option-price">${fmt(opt.price)}</span>
-        `;
-        div.addEventListener('change', updateTotal);
-        list.appendChild(div);
-      });
+      let checkboxIdx = 0;
+
+      const isHierarchical = data.length > 0 && data[0].category !== undefined;
+
+      if (isHierarchical) {
+        data.forEach(cat => {
+          // Category heading
+          const heading = document.createElement('div');
+          heading.className = 'category-heading';
+          heading.textContent = cat.category;
+          list.appendChild(heading);
+
+          cat.items.forEach(item => {
+            const id = `opt-${checkboxIdx++}`;
+            const label = document.createElement('label');
+            label.className = 'option';
+            label.htmlFor = id;
+            label.innerHTML = `
+              <input type="checkbox" id="${id}" data-price="${item.price}">
+              <span class="option-label">${item.label}</span>
+              <span class="option-price">${fmt(item.price)}</span>
+            `;
+            label.addEventListener('change', updateTotal);
+            list.appendChild(label);
+          });
+        });
+      } else {
+        data.forEach(opt => {
+          const id = `opt-${checkboxIdx++}`;
+          const label = document.createElement('label');
+          label.className = 'option';
+          label.htmlFor = id;
+          label.innerHTML = `
+            <input type="checkbox" id="${id}" data-price="${opt.price}">
+            <span class="option-label">${opt.label}</span>
+            <span class="option-price">${fmt(opt.price)}</span>
+          `;
+          label.addEventListener('change', updateTotal);
+          list.appendChild(label);
+        });
+      }
     }
 
     async function loadOptions() {
-      let options = null;
+      const cacheKey = `cachedEstimateOptions_${company}`;
+      let data = null;
+
       try {
-        const res = await fetch(`${serverUrl}/api/estimate-options`);
+        const res = await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(company)}`);
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            options = data;
-            localStorage.setItem('cachedEstimateOptions', JSON.stringify(options));
+          const fetched = await res.json();
+          if (Array.isArray(fetched) && fetched.length > 0) {
+            data = fetched;
+            localStorage.setItem(cacheKey, JSON.stringify(data));
           }
         }
-      } catch { /* fall through */ }
+      } catch { /* fall through to cache */ }
 
-      if (!options) {
+      if (!data) {
         try {
-          const cached = localStorage.getItem('cachedEstimateOptions');
-          if (cached) options = JSON.parse(cached);
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) data = JSON.parse(cached);
         } catch { /* ignore */ }
       }
 
-      buildOptions(options && options.length > 0 ? options : FALLBACK_OPTIONS);
+      if (data && data.length > 0) {
+        buildOptions(data);
+      } else {
+        document.getElementById('options-list').innerHTML =
+          '<p style="color:#666;text-align:center;padding:40px 0;">No options configured for this vehicle.</p>';
+      }
     }
 
     loadOptions();

@@ -15,38 +15,94 @@
       width: 100%;
       height: 100%;
       background: #111;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      color: #f0f0f0;
       font-family: sans-serif;
       overflow: hidden;
     }
 
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 22px 32px;
+      background: #1a1a1a;
+      border-bottom: 2px solid #c0392b;
+    }
+
+    .header-logo {
+      height: 25px;
+      width: auto;
+    }
+
+    /* ── Main ── */
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: calc(100% - 74px);
+      gap: 20px;
+    }
+
+    .tagline {
+      font-size: 1.1rem;
+      color: #666;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
     .estimate-btn {
-      padding: 40px 80px;
-      font-size: 2.5rem;
+      padding: 44px 100px;
+      font-size: 2.6rem;
       font-weight: bold;
       letter-spacing: 0.05em;
       color: #fff;
-      background: #c0392b;
-      border: none;
-      border-radius: 12px;
+      background: #1a1a1a;
+      border: 2px solid #2a2a2a;
+      border-radius: 14px;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
       user-select: none;
     }
 
-    .estimate-btn:hover {
-      background: #a93226;
+    .estimate-btn:hover { background: #222; border-color: #c0392b; }
+    .estimate-btn:active { transform: scale(0.97); }
+
+    /* ── Contact button (bottom-left) ── */
+    .contact-btn {
+      position: fixed;
+      bottom: 28px;
+      left: 28px;
+      padding: 12px 22px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #fff;
+      background: #1a1a1a;
+      border: 2px solid #2a2a2a;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      user-select: none;
+      letter-spacing: 0.03em;
     }
 
-    .estimate-btn:active {
-      transform: scale(0.97);
-    }
+    .contact-btn:hover { background: #222; border-color: #c0392b; }
+    .contact-btn:active { transform: scale(0.97); }
   </style>
 </head>
 <body>
-  <button class="estimate-btn" onclick="window.location.href='estimate.html'">Estimate</button>
+
+  <header>
+    <img src="logo.png" alt="JL Customs" class="header-logo">
+  </header>
+
+  <main>
+    <!-- <p class="tagline">Custom Commercial Vehicles</p> -->
+    <button class="estimate-btn" onclick="window.location.href='vehicle-select.html'">Get an Estimate</button>
+  </main>
+
+  <button class="contact-btn" onclick="window.location.href='contact.html'">Contact an Expert</button>
 
   <script>
     const TIMEOUT_MS = 60 * 1000;
@@ -61,14 +117,12 @@
       inactivityTimer = setTimeout(goBack, TIMEOUT_MS);
     }
 
-    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach((event) => {
-      document.addEventListener(event, resetTimer, { passive: true });
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach((ev) => {
+      document.addEventListener(ev, resetTimer, { passive: true });
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        goBack();
-      }
+      if (e.key === 'Escape' || e.key === 'Backspace') goBack();
     });
 
     resetTimer();

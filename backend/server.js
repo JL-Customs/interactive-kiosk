@@ -55,7 +55,7 @@ let photos = [];
 let settings = {
   rotationInterval: 5
 };
-let estimateOptions = [];
+let estimateOptions = {}; // keyed by company name
 
 function getBaseUrl(req) {
   const configuredBaseUrl = process.env.PUBLIC_BASE_URL;
@@ -137,11 +137,12 @@ function saveSettings() {
 function loadEstimateOptions() {
   if (fs.existsSync(estimateOptionsFile)) {
     try {
-      const data = fs.readFileSync(estimateOptionsFile, 'utf8');
-      estimateOptions = JSON.parse(data);
+      const data = JSON.parse(fs.readFileSync(estimateOptionsFile, 'utf8'));
+      // Migrate: if stored as a flat array (old format), ignore it
+      estimateOptions = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
     } catch (error) {
       console.error('Error loading estimate options:', error);
-      estimateOptions = [];
+      estimateOptions = {};
     }
   }
 }
@@ -318,21 +319,30 @@ app.patch('/api/photos/:id', express.json(), (req, res) => {
 });
 
 /**
- * Get estimate options
+ * Get all companies (returns object keyed by company name)
  */
 app.get('/api/estimate-options', (req, res) => {
   res.json(estimateOptions);
 });
 
 /**
- * Save estimate options
+ * Get estimate options for a specific company
  */
-app.post('/api/estimate-options', express.json(), (req, res) => {
+app.get('/api/estimate-options/:company', (req, res) => {
+  const company = req.params.company;
+  res.json(estimateOptions[company] || []);
+});
+
+/**
+ * Save estimate options for a specific company
+ */
+app.post('/api/estimate-options/:company', express.json(), (req, res) => {
+  const company = req.params.company;
   const { options } = req.body;
   if (!Array.isArray(options)) {
     return res.status(400).json({ error: 'options must be an array' });
   }
-  estimateOptions = options;
+  estimateOptions[company] = options;
   saveEstimateOptions();
   res.json({ success: true });
 });

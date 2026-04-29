@@ -89,27 +89,42 @@ function handleFiles(files) {
   const uploadArea = document.getElementById('upload-area');
   const summaryEl = document.getElementById('selected-files-summary');
   const listEl = document.getElementById('selected-files-list');
-  const selectedFiles = Array.from(files || []);
+  const allFiles = Array.from(files || []);
 
-  fileInput.files = files;
+  const csvFiles = allFiles.filter(f => f.type === 'text/csv' || f.name.toLowerCase().endsWith('.csv'));
+  const imageFiles = allFiles.filter(f => f.type.startsWith('image/'));
 
-  if (selectedFiles.length === 0) {
+  // Process CSVs immediately
+  if (csvFiles.length > 0) {
+    csvFiles.forEach(f => parseAndLoadCsvAuto(f));
+  }
+
+  // Stage images using a DataTransfer so fileInput.files reflects only images
+  const dt = new DataTransfer();
+  imageFiles.forEach(f => dt.items.add(f));
+  fileInput.files = dt.files;
+
+  if (imageFiles.length === 0) {
     uploadArea.classList.remove('has-files');
-    summaryEl.textContent = 'No files selected yet.';
-    listEl.innerHTML = '';
+    if (csvFiles.length > 0) {
+      summaryEl.textContent = `${csvFiles.length} CSV file(s) imported as estimate options.`;
+      listEl.innerHTML = '';
+    } else {
+      summaryEl.textContent = 'No files selected yet.';
+      listEl.innerHTML = '';
+    }
     return;
   }
 
   uploadArea.classList.add('has-files');
-  summaryEl.textContent = `${selectedFiles.length} file(s) staged and ready to upload.`;
-  listEl.innerHTML = selectedFiles.map((file) => `
+  const csvNote = csvFiles.length > 0 ? ` (+${csvFiles.length} CSV imported)` : '';
+  summaryEl.textContent = `${imageFiles.length} photo(s) staged and ready to upload${csvNote}.`;
+  listEl.innerHTML = imageFiles.map((file) => `
     <li>
       <span>${file.name}</span>
       <span class="selected-file-size">${formatFileSize(file.size)}</span>
     </li>
   `).join('');
-
-  console.log(`${selectedFiles.length} files selected for upload`);
 }
 
 async function uploadFiles() {
@@ -643,12 +658,19 @@ function setupEventListeners() {
 }
 
 // ── Estimate Options (CSV tab) ─────────────────────────────────
+// estimateOptions shape: [{ category: string, items: [{ label, price }] }]
 
 let estimateOptions = [];
+let currentCompany = 'Company_1';
 
 function setupCsvTab() {
   const dropZone = document.getElementById('csv-upload-area');
   const fileInput = document.getElementById('csv-file-input');
+  const companyInput = document.getElementById('company-name-input');
+
+  companyInput.addEventListener('change', () => {
+    currentCompany = companyInput.value.trim() || 'Company_1';
+  });
 
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('dragover', (e) => {
@@ -666,63 +688,160 @@ function setupCsvTab() {
     fileInput.value = '';
   });
 
-  document.getElementById('add-option-btn').addEventListener('click', () => {
-    estimateOptions.push({ label: '', price: 0 });
-    renderOptionsTable();
-  });
-
+  document.getElementById('add-option-btn').addEventListener('click', addCategory);
   document.getElementById('save-options-btn').addEventListener('click', saveEstimateOptions);
   document.getElementById('export-csv-btn').addEventListener('click', exportOptionsCsv);
 }
 
-function parseCsvLine(line) {
-  const lastComma = line.lastIndexOf(',');
-  if (lastComma === -1) return null;
-  const label = line.slice(0, lastComma).trim().replace(/^"|"$/g, '');
-  const priceStr = line.slice(lastComma + 1).replace(/[^0-9.]/g, '');
-  const price = parseFloat(priceStr);
-  if (!label || isNaN(price)) return null;
-  return { label, price };
+// Parse CSV text into [{ category, items }]
+// Supports: "Category,Item,Price" (3 col) or legacy "Item,Price" (2 col → "General")
+function parseCsvText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const map = new Map();
+
+  for (const line of lines) {
+    const parts = line.split(',');
+    if (parts.length >= 3) {
+      const category = parts[0].trim().replace(/^"|"$/g, '');
+      const label = parts.slice(1, -1).join(',').trim().replace(/^"|"$/g, '');
+      const price = parseFloat(parts[parts.length - 1].replace(/[^0-9.]/g, ''));
+      if (!category || !label || isNaN(price)) continue;
+      if (category.toLowerCase() === 'category') continue; // skip header
+      if (!map.has(category)) map.set(category, []);
+      map.get(category).push({ label, price });
+    } else if (parts.length === 2) {
+      const label = parts[0].trim().replace(/^"|"$/g, '');
+      const price = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
+      if (!label || isNaN(price)) continue;
+      if (!map.has('General')) map.set('General', []);
+      map.get('General').push({ label, price });
+    }
+  }
+
+  return Array.from(map.entries()).map(([category, items]) => ({ category, items }));
+}
+
+// Normalize loaded data: handle both new [{category,items}] and old [{label,price}] formats
+function normalizeEstimateOptions(data) {
+  if (!Array.isArray(data) || data.length === 0) return [];
+  if (data[0].category !== undefined) return data;
+  // Legacy flat format
+  return [{ category: 'General', items: data }];
 }
 
 function parseAndLoadCsv(file) {
+  // Auto-detect company name from filename (strip .csv extension)
+  const detectedCompany = file.name.replace(/\.csv$/i, '');
+  if (detectedCompany) {
+    currentCompany = detectedCompany;
+    const companyInput = document.getElementById('company-name-input');
+    if (companyInput) companyInput.value = currentCompany;
+  }
+
   const reader = new FileReader();
   reader.onload = (e) => {
-    const lines = e.target.result.split('\n').map(l => l.trim()).filter(Boolean);
-    const parsed = lines.map(parseCsvLine).filter(Boolean);
+    const parsed = parseCsvText(e.target.result);
     if (parsed.length === 0) {
-      setOptionsStatus('No valid rows found. Expected format: Service Name, Price');
+      setOptionsStatus('No valid rows found. Expected: Category, Item, Price');
       return;
     }
     estimateOptions = parsed;
     renderOptionsTable();
-    setOptionsStatus(`Imported ${parsed.length} option(s) from CSV.`);
+    const total = parsed.reduce((s, c) => s + c.items.length, 0);
+    setOptionsStatus(`Imported ${total} item(s) across ${parsed.length} category/categories from ${file.name}.`);
+  };
+  reader.readAsText(file);
+}
+
+function parseAndLoadCsvAuto(file) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const parsed = parseCsvText(e.target.result);
+    if (parsed.length === 0) return;
+
+    // Merge categories — append new items to existing categories
+    for (const incoming of parsed) {
+      const existing = estimateOptions.find(c => c.category.toLowerCase() === incoming.category.toLowerCase());
+      if (existing) {
+        const existingLabels = new Set(existing.items.map(i => i.label.toLowerCase()));
+        incoming.items.filter(i => !existingLabels.has(i.label.toLowerCase()))
+          .forEach(i => existing.items.push(i));
+      } else {
+        estimateOptions.push(incoming);
+      }
+    }
+    renderOptionsTable();
+
+    if (window.localStore) {
+      await window.localStore.saveEstimateOptions(estimateOptions).catch(() => {});
+    }
+    try {
+      await fetch(`${serverUrl}/api/estimate-options`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options: estimateOptions }),
+      });
+    } catch { /* server offline — saved locally */ }
+
+    const total = parsed.reduce((s, c) => s + c.items.length, 0);
+    setOptionsStatus(`CSV imported: ${total} item(s) from ${file.name} merged into estimate options.`);
   };
   reader.readAsText(file);
 }
 
 function syncOptionsFromInputs() {
+  document.querySelectorAll('.opt-category-input').forEach(input => {
+    const c = Number(input.dataset.cat);
+    if (estimateOptions[c]) estimateOptions[c].category = input.value;
+  });
   document.querySelectorAll('.opt-label-input').forEach(input => {
-    estimateOptions[Number(input.dataset.idx)].label = input.value;
+    const c = Number(input.dataset.cat), i = Number(input.dataset.item);
+    if (estimateOptions[c]?.items[i]) estimateOptions[c].items[i].label = input.value;
   });
   document.querySelectorAll('.opt-price-input').forEach(input => {
-    estimateOptions[Number(input.dataset.idx)].price = Number(input.value);
+    const c = Number(input.dataset.cat), i = Number(input.dataset.item);
+    if (estimateOptions[c]?.items[i]) estimateOptions[c].items[i].price = Number(input.value);
   });
 }
 
 function renderOptionsTable() {
   const tbody = document.getElementById('options-tbody');
   if (estimateOptions.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a row.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a category.</td></tr>';
     return;
   }
-  tbody.innerHTML = estimateOptions.map((opt, i) => `
-    <tr>
-      <td><input type="text" class="opt-label-input" data-idx="${i}" value="${escHtml(opt.label)}" placeholder="Service name"></td>
-      <td><input type="number" class="opt-price-input" data-idx="${i}" value="${opt.price}" min="0" step="1"></td>
-      <td><button class="btn-delete-single" onclick="removeOption(${i})">Remove</button></td>
-    </tr>
-  `).join('');
+
+  let html = '';
+  estimateOptions.forEach((cat, catIdx) => {
+    html += `
+      <tr class="category-header-row">
+        <td colspan="2">
+          <input type="text" class="opt-category-input" data-cat="${catIdx}" value="${escHtml(cat.category)}" placeholder="Category name">
+        </td>
+        <td>
+          <button class="btn-delete-single" onclick="removeCategory(${catIdx})">Remove Category</button>
+        </td>
+      </tr>
+    `;
+    cat.items.forEach((item, itemIdx) => {
+      html += `
+        <tr class="category-item-row">
+          <td><input type="text" class="opt-label-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${escHtml(item.label)}" placeholder="Item name"></td>
+          <td><input type="number" class="opt-price-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${item.price}" min="0" step="1"></td>
+          <td><button class="btn-delete-single" onclick="removeItem(${catIdx},${itemIdx})">Remove</button></td>
+        </tr>
+      `;
+    });
+    html += `
+      <tr class="category-add-row">
+        <td colspan="3">
+          <button class="btn btn-primary add-item-btn" onclick="addItem(${catIdx})">+ Add Item</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
 }
 
 function escHtml(str) {
@@ -733,28 +852,63 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function removeOption(idx) {
+function addCategory() {
   syncOptionsFromInputs();
-  estimateOptions.splice(idx, 1);
+  estimateOptions.push({ category: 'New Category', items: [] });
   renderOptionsTable();
+}
+
+function addItem(catIdx) {
+  syncOptionsFromInputs();
+  if (estimateOptions[catIdx]) {
+    estimateOptions[catIdx].items.push({ label: '', price: 0 });
+    renderOptionsTable();
+  }
+}
+
+function removeCategory(catIdx) {
+  syncOptionsFromInputs();
+  estimateOptions.splice(catIdx, 1);
+  renderOptionsTable();
+}
+
+function removeItem(catIdx, itemIdx) {
+  syncOptionsFromInputs();
+  if (estimateOptions[catIdx]) {
+    estimateOptions[catIdx].items.splice(itemIdx, 1);
+    renderOptionsTable();
+  }
 }
 
 async function saveEstimateOptions() {
   syncOptionsFromInputs();
-  const valid = estimateOptions.filter(o => o.label.trim() && !isNaN(o.price));
+  currentCompany = (document.getElementById('company-name-input')?.value.trim()) || currentCompany;
 
+  const valid = estimateOptions
+    .map(cat => ({
+      ...cat,
+      category: cat.category.trim(),
+      items: cat.items.filter(i => i.label.trim() && !isNaN(i.price)),
+    }))
+    .filter(cat => cat.category && cat.items.length > 0);
+
+  // Save to local store keyed by company
   if (window.localStore) {
-    await window.localStore.saveEstimateOptions(valid).catch(() => {});
+    const allLocal = await window.localStore.loadEstimateOptions().catch(() => ({}));
+    const stored = (allLocal && !Array.isArray(allLocal)) ? allLocal : {};
+    stored[currentCompany] = valid;
+    await window.localStore.saveEstimateOptions(stored).catch(() => {});
   }
 
   try {
-    const res = await fetch(`${serverUrl}/api/estimate-options`, {
+    const res = await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(currentCompany)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ options: valid }),
     });
+    const total = valid.reduce((s, c) => s + c.items.length, 0);
     if (res.ok) {
-      setOptionsStatus(`Saved ${valid.length} option(s) to server.`);
+      setOptionsStatus(`Saved ${total} item(s) for "${currentCompany}".`);
     } else {
       setOptionsStatus('Saved locally. Server returned an error.');
     }
@@ -765,11 +919,12 @@ async function saveEstimateOptions() {
 
 async function loadEstimateOptionsFromServer() {
   try {
-    const res = await fetch(`${serverUrl}/api/estimate-options`);
+    const res = await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(currentCompany)}`);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        estimateOptions = data;
+      const normalized = normalizeEstimateOptions(data);
+      if (normalized.length > 0) {
+        estimateOptions = normalized;
         renderOptionsTable();
         return;
       }
@@ -777,9 +932,11 @@ async function loadEstimateOptionsFromServer() {
   } catch { /* fall through to local */ }
 
   if (window.localStore) {
-    const local = await window.localStore.loadEstimateOptions().catch(() => []);
-    if (local && local.length > 0) {
-      estimateOptions = local;
+    const allLocal = await window.localStore.loadEstimateOptions().catch(() => null);
+    const companyData = (allLocal && !Array.isArray(allLocal)) ? allLocal[currentCompany] : allLocal;
+    const normalized = normalizeEstimateOptions(companyData);
+    if (normalized.length > 0) {
+      estimateOptions = normalized;
       renderOptionsTable();
     }
   }
@@ -788,20 +945,31 @@ async function loadEstimateOptionsFromServer() {
 async function pushLocalEstimateOptionsToServer() {
   if (!window.localStore) return;
   try {
-    const local = await window.localStore.loadEstimateOptions().catch(() => null);
-    if (!local || local.length === 0) return;
-    await fetch(`${serverUrl}/api/estimate-options`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ options: local }),
-    });
-  } catch { /* server offline — will retry next startup */ }
+    const allLocal = await window.localStore.loadEstimateOptions().catch(() => null);
+    if (!allLocal) return;
+    const companies = (allLocal && !Array.isArray(allLocal)) ? allLocal : { [currentCompany]: allLocal };
+    for (const [company, options] of Object.entries(companies)) {
+      if (!options || options.length === 0) continue;
+      await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(company)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options }),
+      }).catch(() => {});
+    }
+  } catch { /* server offline */ }
 }
 
 function exportOptionsCsv() {
   syncOptionsFromInputs();
-  const rows = estimateOptions.map(o => `"${String(o.label).replace(/"/g, '""')}",${o.price}`);
-  const csv = 'Service Name,Price\n' + rows.join('\n');
+  const rows = [];
+  estimateOptions.forEach(cat => {
+    cat.items.forEach(item => {
+      const cat_ = String(cat.category).replace(/"/g, '""');
+      const label = String(item.label).replace(/"/g, '""');
+      rows.push(`"${cat_}","${label}",${item.price}`);
+    });
+  });
+  const csv = 'Category,Item,Price\n' + rows.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

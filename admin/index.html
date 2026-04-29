@@ -45,8 +45,9 @@
       <section id="upload" class="section">
         <h2>Upload Photos</h2>
         <div class="upload-area" id="upload-area">
-          <p>Drag and drop photos here or click to select</p>
-          <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
+          <p>Drag and drop photos or CSV files here, or click to select</p>
+          <p style="font-size:0.8rem;color:#888;margin-top:4px;">Images are added to the gallery &mdash; CSV files update estimate options</p>
+          <input type="file" id="file-input" multiple accept="image/*,.csv,text/csv" style="display: none;">
         </div>
         <div id="selected-files" class="selected-files" aria-live="polite">
           <p id="selected-files-summary" class="selected-files-summary">No files selected yet.</p>
@@ -104,6 +105,10 @@
         <p style="color:#666;font-size:0.85rem;margin-bottom:1rem;">
           Define the services shown on the kiosk estimate page. Upload a CSV (columns: Service Name, Price) or edit manually.
         </p>
+        <div class="form-group" style="max-width:320px;margin-bottom:1rem;">
+          <label for="company-name-input">Company / Vehicle Brand:</label>
+          <input type="text" id="company-name-input" placeholder="e.g. Company_1" value="Company_1">
+        </div>
         <div class="csv-drop-zone" id="csv-upload-area">
           <p>Drop a CSV file here or click to import</p>
           <p style="font-size:0.8rem;color:#aaa;margin-top:4px;">Format: two columns — Service Name, Price</p>
@@ -112,17 +117,17 @@
         <table class="photo-table" id="options-table" style="margin-top:1rem;">
           <thead>
             <tr>
-              <th>Service / Item</th>
+              <th>Item</th>
               <th>Price ($)</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="options-tbody">
-            <tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a row.</td></tr>
+            <tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a category.</td></tr>
           </tbody>
         </table>
         <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <button class="btn btn-primary" id="add-option-btn">+ Add Row</button>
+          <button class="btn btn-primary" id="add-option-btn">+ Add Category</button>
           <button class="btn btn-primary" id="save-options-btn">Save &amp; Push to Server</button>
           <button class="btn csv-export-btn" id="export-csv-btn">Export CSV</button>
         </div>

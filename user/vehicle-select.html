@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JL Customs - Select Vehicle</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #111;
+      color: #f0f0f0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 18px 32px;
+      background: #1a1a1a;
+      border-bottom: 2px solid #c0392b;
+      flex-shrink: 0;
+    }
+
+    #back-btn {
+      background: none;
+      border: 2px solid #555;
+      color: #ccc;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    #back-btn:hover {
+      border-color: #fff;
+      color: #fff;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 32px;
+      gap: 24px;
+    }
+
+    .prompt {
+      font-size: 1.4rem;
+      color: #aaa;
+      letter-spacing: 0.03em;
+    }
+
+    .vehicle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      width: 100%;
+      max-width: 760px;
+    }
+
+    .vehicle-btn {
+      padding: 40px 20px;
+      font-size: 1.8rem;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      color: #fff;
+      background: #1a1a1a;
+      border: 2px solid #2a2a2a;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    .vehicle-btn:hover {
+      background: #222;
+      border-color: #c0392b;
+    }
+
+    .vehicle-btn:active {
+      transform: scale(0.97);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <button id="back-btn">&#8592; Back</button>
+    <h1>Select Your Vehicle Brand</h1>
+  </header>
+
+  <main>
+    <p class="prompt">What is your vehicle?</p>
+    <div class="vehicle-grid">
+      <button class="vehicle-btn" onclick="selectCompany('Company_1')">Company 1</button>
+      <button class="vehicle-btn" onclick="selectCompany('Company_2')">Company 2</button>
+      <button class="vehicle-btn" onclick="selectCompany('Company_3')">Company 3</button>
+      <button class="vehicle-btn" onclick="selectCompany('Company_4')">Company 4</button>
+    </div>
+  </main>
+
+  <script>
+    function selectCompany(company) {
+      window.location.href = `estimate.html?company=${encodeURIComponent(company)}`;
+    }
+
+    document.getElementById('back-btn').addEventListener('click', () => {
+      window.location.href = 'home.html';
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        window.location.href = 'home.html';
+      }
+    });
+
+    const TIMEOUT_MS = 60 * 1000;
+    let inactivityTimer;
+
+    function resetTimer() {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        window.location.href = 'index.html';
+      }, TIMEOUT_MS);
+    }
+
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach((ev) => {
+      document.addEventListener(ev, resetTimer, { passive: true });
+    });
+
+    resetTimer();
+  </script>
+</body>
+</html>
