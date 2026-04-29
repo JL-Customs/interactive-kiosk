@@ -1,0 +1,31 @@
+Category,Item,Price,Requires
+Category 1,Item 1,3500,
+Category 1,Item 2,1800,
+Category 1,Item 3,800,
+Category 1,Item 4,650,
+Category 1,Item 5,950,
+Category 2,Item 6,600,Item 1
+Category 2,Item 7,400,Item 1|Item 2
+Category 2,Item 8,350,Item 2
+Category 2,Item 9,250,Item 3
+Category 2,Item 10,480,
+Category 3,Item 11,1200,Item 1
+Category 3,Item 12,900,Item 2|Item 3
+Category 3,Item 13,1500,Item 1
+Category 3,Item 14,180,
+Category 3,Item 15,120,Item 4|Item 5
+Category 4,Item 16,450,Item 1|Item 2
+Category 4,Item 17,300,Item 3
+Category 4,Item 18,200,
+Category 4,Item 19,550,Item 4
+Category 4,Item 20,380,Item 5
+Category 5,Item 21,380,Item 1
+Category 5,Item 22,750,Item 2
+Category 5,Item 23,1400,Item 3|Item 4
+Category 5,Item 24,600,
+Category 5,Item 25,520,Item 5
+Category 6,Item 26,150,
+Category 6,Item 27,280,Item 1|Item 2
+Category 6,Item 28,2200,Item 3
+Category 6,Item 29,180,Item 4|Item 5
+Category 6,Item 30,320,

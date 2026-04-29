@@ -476,6 +476,16 @@ footer {
   margin: 0;
 }
 
+.opt-requires-input {
+  width: 100%;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  color: #555;
+  font-style: italic;
+}
+
 #upload-progress {
   margin: 0.5rem 0;
 }

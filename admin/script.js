@@ -694,27 +694,44 @@ function setupCsvTab() {
 }
 
 // Parse CSV text into [{ category, items }]
-// Supports: "Category,Item,Price" (3 col) or legacy "Item,Price" (2 col → "General")
+// Supports:
+//   4 col: "Category, Item, Price, Requires"  (Requires = pipe-separated item labels)
+//   3 col: "Category, Item, Price"
+//   2 col: "Item, Price"  (legacy → "General" category)
 function parseCsvText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const map = new Map();
 
   for (const line of lines) {
     const parts = line.split(',');
+
     if (parts.length >= 3) {
       const category = parts[0].trim().replace(/^"|"$/g, '');
-      const label = parts.slice(1, -1).join(',').trim().replace(/^"|"$/g, '');
-      const price = parseFloat(parts[parts.length - 1].replace(/[^0-9.]/g, ''));
-      if (!category || !label || isNaN(price)) continue;
       if (category.toLowerCase() === 'category') continue; // skip header
+
+      let label, price, requires = [];
+
+      if (parts.length >= 4) {
+        // 4-col: Category, Item, Price, Requires
+        label = parts[1].trim().replace(/^"|"$/g, '');
+        price = parseFloat(parts[2].replace(/[^0-9.]/g, ''));
+        const req = parts[3].trim().replace(/^"|"$/g, '');
+        requires = req ? req.split('|').map(r => r.trim()).filter(Boolean) : [];
+      } else {
+        // 3-col: Category, Item, Price
+        label = parts[1].trim().replace(/^"|"$/g, '');
+        price = parseFloat(parts[2].replace(/[^0-9.]/g, ''));
+      }
+
+      if (!category || !label || isNaN(price)) continue;
       if (!map.has(category)) map.set(category, []);
-      map.get(category).push({ label, price });
+      map.get(category).push({ label, price, requires });
     } else if (parts.length === 2) {
       const label = parts[0].trim().replace(/^"|"$/g, '');
       const price = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
       if (!label || isNaN(price)) continue;
       if (!map.has('General')) map.set('General', []);
-      map.get('General').push({ label, price });
+      map.get('General').push({ label, price, requires: [] });
     }
   }
 
@@ -802,12 +819,19 @@ function syncOptionsFromInputs() {
     const c = Number(input.dataset.cat), i = Number(input.dataset.item);
     if (estimateOptions[c]?.items[i]) estimateOptions[c].items[i].price = Number(input.value);
   });
+  document.querySelectorAll('.opt-requires-input').forEach(input => {
+    const c = Number(input.dataset.cat), i = Number(input.dataset.item);
+    if (estimateOptions[c]?.items[i]) {
+      const val = input.value.trim();
+      estimateOptions[c].items[i].requires = val ? val.split('|').map(r => r.trim()).filter(Boolean) : [];
+    }
+  });
 }
 
 function renderOptionsTable() {
   const tbody = document.getElementById('options-tbody');
   if (estimateOptions.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a category.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a category.</td></tr>';
     return;
   }
 
@@ -815,7 +839,7 @@ function renderOptionsTable() {
   estimateOptions.forEach((cat, catIdx) => {
     html += `
       <tr class="category-header-row">
-        <td colspan="2">
+        <td colspan="3">
           <input type="text" class="opt-category-input" data-cat="${catIdx}" value="${escHtml(cat.category)}" placeholder="Category name">
         </td>
         <td>
@@ -824,17 +848,19 @@ function renderOptionsTable() {
       </tr>
     `;
     cat.items.forEach((item, itemIdx) => {
+      const requiresVal = Array.isArray(item.requires) ? item.requires.join('|') : (item.requires || '');
       html += `
         <tr class="category-item-row">
           <td><input type="text" class="opt-label-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${escHtml(item.label)}" placeholder="Item name"></td>
           <td><input type="number" class="opt-price-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${item.price}" min="0" step="1"></td>
+          <td><input type="text" class="opt-requires-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${escHtml(requiresVal)}" placeholder="Item 1|Item 2"></td>
           <td><button class="btn-delete-single" onclick="removeItem(${catIdx},${itemIdx})">Remove</button></td>
         </tr>
       `;
     });
     html += `
       <tr class="category-add-row">
-        <td colspan="3">
+        <td colspan="4">
           <button class="btn btn-primary add-item-btn" onclick="addItem(${catIdx})">+ Add Item</button>
         </td>
       </tr>
@@ -966,10 +992,11 @@ function exportOptionsCsv() {
     cat.items.forEach(item => {
       const cat_ = String(cat.category).replace(/"/g, '""');
       const label = String(item.label).replace(/"/g, '""');
-      rows.push(`"${cat_}","${label}",${item.price}`);
+      const req = Array.isArray(item.requires) ? item.requires.join('|') : (item.requires || '');
+      rows.push(`"${cat_}","${label}",${item.price},${req}`);
     });
   });
-  const csv = 'Category,Item,Price\n' + rows.join('\n');
+  const csv = 'Category,Item,Price,Requires\n' + rows.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
