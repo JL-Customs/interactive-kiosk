@@ -395,29 +395,56 @@
   <script>
     const serverUrl = 'https://interactive-monitor-thing.onrender.com';
 
-    const OPTIONS = [
-      { label: 'Full Vehicle Wrap',      price: 3500 },
-      { label: 'LED Light Bar - Front',  price:  600 },
+    const FALLBACK_OPTIONS = [
+      { label: 'Full Vehicle Wrap',        price: 3500 },
+      { label: 'LED Light Bar - Front',    price:  600 },
       { label: 'Custom Wheels (set of 4)', price: 1200 },
     ];
 
     const fmt = (n) => '$' + n.toLocaleString('en-US');
 
-    // Build options
-    const list = document.getElementById('options-list');
-    OPTIONS.forEach((opt, i) => {
-      const id = `opt-${i}`;
-      const div = document.createElement('label');
-      div.className = 'option';
-      div.htmlFor = id;
-      div.innerHTML = `
-        <input type="checkbox" id="${id}" data-price="${opt.price}">
-        <span class="option-label">${opt.label}</span>
-        <span class="option-price">${fmt(opt.price)}</span>
-      `;
-      div.addEventListener('change', updateTotal);
-      list.appendChild(div);
-    });
+    function buildOptions(options) {
+      const list = document.getElementById('options-list');
+      list.innerHTML = '';
+      options.forEach((opt, i) => {
+        const id = `opt-${i}`;
+        const div = document.createElement('label');
+        div.className = 'option';
+        div.htmlFor = id;
+        div.innerHTML = `
+          <input type="checkbox" id="${id}" data-price="${opt.price}">
+          <span class="option-label">${opt.label}</span>
+          <span class="option-price">${fmt(opt.price)}</span>
+        `;
+        div.addEventListener('change', updateTotal);
+        list.appendChild(div);
+      });
+    }
+
+    async function loadOptions() {
+      let options = null;
+      try {
+        const res = await fetch(`${serverUrl}/api/estimate-options`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            options = data;
+            localStorage.setItem('cachedEstimateOptions', JSON.stringify(options));
+          }
+        }
+      } catch { /* fall through */ }
+
+      if (!options) {
+        try {
+          const cached = localStorage.getItem('cachedEstimateOptions');
+          if (cached) options = JSON.parse(cached);
+        } catch { /* ignore */ }
+      }
+
+      buildOptions(options && options.length > 0 ? options : FALLBACK_OPTIONS);
+    }
+
+    loadOptions();
 
     function getChecked() {
       return Array.from(document.querySelectorAll('input[type="checkbox"]:checked'));

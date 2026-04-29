@@ -17,6 +17,7 @@
       <button class="nav-btn" data-section="upload">Upload Photos</button>
       <button class="nav-btn" data-section="manage">Manage Gallery</button>
       <button class="nav-btn" data-section="settings">Settings</button>
+      <button class="nav-btn" data-section="csv">Estimate Options</button>
     </nav>
 
     <main id="content">
@@ -96,6 +97,36 @@
           </div>
           <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
         </div>
+      </section>
+      <!-- Estimate Options Section -->
+      <section id="csv" class="section">
+        <h2>Estimate Options</h2>
+        <p style="color:#666;font-size:0.85rem;margin-bottom:1rem;">
+          Define the services shown on the kiosk estimate page. Upload a CSV (columns: Service Name, Price) or edit manually.
+        </p>
+        <div class="csv-drop-zone" id="csv-upload-area">
+          <p>Drop a CSV file here or click to import</p>
+          <p style="font-size:0.8rem;color:#aaa;margin-top:4px;">Format: two columns — Service Name, Price</p>
+          <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none;">
+        </div>
+        <table class="photo-table" id="options-table" style="margin-top:1rem;">
+          <thead>
+            <tr>
+              <th>Service / Item</th>
+              <th>Price ($)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="options-tbody">
+            <tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a row.</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="add-option-btn">+ Add Row</button>
+          <button class="btn btn-primary" id="save-options-btn">Save &amp; Push to Server</button>
+          <button class="btn csv-export-btn" id="export-csv-btn">Export CSV</button>
+        </div>
+        <p id="options-status" style="margin-top:0.5rem;font-size:0.85rem;color:#666;min-height:1.2em;"></p>
       </section>
     </main>
 

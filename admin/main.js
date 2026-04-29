@@ -7,12 +7,14 @@ let storeDir;
 let storeFilesDir;
 let storeMetadataFile;
 let storeSettingsFile;
+let storeEstimateOptionsFile;
 
 function setupStore() {
   storeDir = path.join(app.getPath('userData'), 'photo-store');
   storeFilesDir = path.join(storeDir, 'files');
   storeMetadataFile = path.join(storeDir, 'metadata.json');
   storeSettingsFile = path.join(storeDir, 'settings.json');
+  storeEstimateOptionsFile = path.join(storeDir, 'estimate-options.json');
   fs.mkdirSync(storeFilesDir, { recursive: true });
 }
 
@@ -85,6 +87,16 @@ ipcMain.handle('store:load-settings', () => {
   if (!fs.existsSync(storeSettingsFile)) return null;
   try { return JSON.parse(fs.readFileSync(storeSettingsFile, 'utf8')); }
   catch { return null; }
+});
+
+ipcMain.handle('store:save-estimate-options', (event, options) => {
+  fs.writeFileSync(storeEstimateOptionsFile, JSON.stringify(options, null, 2));
+});
+
+ipcMain.handle('store:load-estimate-options', () => {
+  if (!fs.existsSync(storeEstimateOptionsFile)) return [];
+  try { return JSON.parse(fs.readFileSync(storeEstimateOptionsFile, 'utf8')); }
+  catch { return []; }
 });
 
 // ── App lifecycle ──────────────────────────────────────────────

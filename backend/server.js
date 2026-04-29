@@ -50,10 +50,12 @@ app.use(express.static('uploads'));
 // File-based photo storage
 const photosDataFile = path.join(__dirname, 'photos-data.json');
 const settingsDataFile = path.join(__dirname, 'settings-data.json');
+const estimateOptionsFile = path.join(__dirname, 'estimate-options.json');
 let photos = [];
 let settings = {
   rotationInterval: 5
 };
+let estimateOptions = [];
 
 function getBaseUrl(req) {
   const configuredBaseUrl = process.env.PUBLIC_BASE_URL;
@@ -132,9 +134,30 @@ function saveSettings() {
   }
 }
 
+function loadEstimateOptions() {
+  if (fs.existsSync(estimateOptionsFile)) {
+    try {
+      const data = fs.readFileSync(estimateOptionsFile, 'utf8');
+      estimateOptions = JSON.parse(data);
+    } catch (error) {
+      console.error('Error loading estimate options:', error);
+      estimateOptions = [];
+    }
+  }
+}
+
+function saveEstimateOptions() {
+  try {
+    fs.writeFileSync(estimateOptionsFile, JSON.stringify(estimateOptions, null, 2));
+  } catch (error) {
+    console.error('Error saving estimate options:', error);
+  }
+}
+
 // Initialize photos
 loadPhotos();
 loadSettings();
+loadEstimateOptions();
 
 // Routes
 
@@ -292,6 +315,26 @@ app.patch('/api/photos/:id', express.json(), (req, res) => {
   } else {
     res.status(400).json({ error: 'No update fields provided' });
   }
+});
+
+/**
+ * Get estimate options
+ */
+app.get('/api/estimate-options', (req, res) => {
+  res.json(estimateOptions);
+});
+
+/**
+ * Save estimate options
+ */
+app.post('/api/estimate-options', express.json(), (req, res) => {
+  const { options } = req.body;
+  if (!Array.isArray(options)) {
+    return res.status(400).json({ error: 'options must be an array' });
+  }
+  estimateOptions = options;
+  saveEstimateOptions();
+  res.json({ success: true });
 });
 
 /**

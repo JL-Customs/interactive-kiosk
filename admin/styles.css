@@ -396,6 +396,51 @@ footer {
   font-size: 0.8rem;
 }
 
+.csv-drop-zone {
+  background: white;
+  border: 2px dashed #0066cc;
+  border-radius: 4px;
+  padding: 1.25rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.2s;
+}
+
+.csv-drop-zone:hover {
+  background: #f0f4ff;
+}
+
+.csv-drop-zone.drag-over {
+  background: #e6f0ff;
+  border-color: #0052a3;
+}
+
+.csv-export-btn {
+  background: #555;
+  color: white;
+}
+
+.csv-export-btn:hover {
+  background: #444;
+}
+
+.opt-label-input {
+  width: 100%;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.opt-price-input {
+  width: 100px;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
 #upload-progress {
   margin: 0.5rem 0;
 }

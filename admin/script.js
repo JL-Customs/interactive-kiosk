@@ -24,8 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
   setupNavigation();
   setupUploadArea();
   setupSettings();
+  setupCsvTab();
   loadSettingsFromServer();
   pushLocalSettingsToServer();
+  pushLocalEstimateOptionsToServer();
+  loadEstimateOptionsFromServer();
   setupManageGallery();
   loadPhotos();
   checkServerStatus();
@@ -637,4 +640,178 @@ function setupEventListeners() {
     loadPhotos();
     checkServerStatus();
   });
+}
+
+// ── Estimate Options (CSV tab) ─────────────────────────────────
+
+let estimateOptions = [];
+
+function setupCsvTab() {
+  const dropZone = document.getElementById('csv-upload-area');
+  const fileInput = document.getElementById('csv-file-input');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) parseAndLoadCsv(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) parseAndLoadCsv(fileInput.files[0]);
+    fileInput.value = '';
+  });
+
+  document.getElementById('add-option-btn').addEventListener('click', () => {
+    estimateOptions.push({ label: '', price: 0 });
+    renderOptionsTable();
+  });
+
+  document.getElementById('save-options-btn').addEventListener('click', saveEstimateOptions);
+  document.getElementById('export-csv-btn').addEventListener('click', exportOptionsCsv);
+}
+
+function parseCsvLine(line) {
+  const lastComma = line.lastIndexOf(',');
+  if (lastComma === -1) return null;
+  const label = line.slice(0, lastComma).trim().replace(/^"|"$/g, '');
+  const priceStr = line.slice(lastComma + 1).replace(/[^0-9.]/g, '');
+  const price = parseFloat(priceStr);
+  if (!label || isNaN(price)) return null;
+  return { label, price };
+}
+
+function parseAndLoadCsv(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const lines = e.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+    const parsed = lines.map(parseCsvLine).filter(Boolean);
+    if (parsed.length === 0) {
+      setOptionsStatus('No valid rows found. Expected format: Service Name, Price');
+      return;
+    }
+    estimateOptions = parsed;
+    renderOptionsTable();
+    setOptionsStatus(`Imported ${parsed.length} option(s) from CSV.`);
+  };
+  reader.readAsText(file);
+}
+
+function syncOptionsFromInputs() {
+  document.querySelectorAll('.opt-label-input').forEach(input => {
+    estimateOptions[Number(input.dataset.idx)].label = input.value;
+  });
+  document.querySelectorAll('.opt-price-input').forEach(input => {
+    estimateOptions[Number(input.dataset.idx)].price = Number(input.value);
+  });
+}
+
+function renderOptionsTable() {
+  const tbody = document.getElementById('options-tbody');
+  if (estimateOptions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a row.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = estimateOptions.map((opt, i) => `
+    <tr>
+      <td><input type="text" class="opt-label-input" data-idx="${i}" value="${escHtml(opt.label)}" placeholder="Service name"></td>
+      <td><input type="number" class="opt-price-input" data-idx="${i}" value="${opt.price}" min="0" step="1"></td>
+      <td><button class="btn-delete-single" onclick="removeOption(${i})">Remove</button></td>
+    </tr>
+  `).join('');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function removeOption(idx) {
+  syncOptionsFromInputs();
+  estimateOptions.splice(idx, 1);
+  renderOptionsTable();
+}
+
+async function saveEstimateOptions() {
+  syncOptionsFromInputs();
+  const valid = estimateOptions.filter(o => o.label.trim() && !isNaN(o.price));
+
+  if (window.localStore) {
+    await window.localStore.saveEstimateOptions(valid).catch(() => {});
+  }
+
+  try {
+    const res = await fetch(`${serverUrl}/api/estimate-options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: valid }),
+    });
+    if (res.ok) {
+      setOptionsStatus(`Saved ${valid.length} option(s) to server.`);
+    } else {
+      setOptionsStatus('Saved locally. Server returned an error.');
+    }
+  } catch {
+    setOptionsStatus('Saved locally. Server is offline — will push on next startup.');
+  }
+}
+
+async function loadEstimateOptionsFromServer() {
+  try {
+    const res = await fetch(`${serverUrl}/api/estimate-options`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        estimateOptions = data;
+        renderOptionsTable();
+        return;
+      }
+    }
+  } catch { /* fall through to local */ }
+
+  if (window.localStore) {
+    const local = await window.localStore.loadEstimateOptions().catch(() => []);
+    if (local && local.length > 0) {
+      estimateOptions = local;
+      renderOptionsTable();
+    }
+  }
+}
+
+async function pushLocalEstimateOptionsToServer() {
+  if (!window.localStore) return;
+  try {
+    const local = await window.localStore.loadEstimateOptions().catch(() => null);
+    if (!local || local.length === 0) return;
+    await fetch(`${serverUrl}/api/estimate-options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: local }),
+    });
+  } catch { /* server offline — will retry next startup */ }
+}
+
+function exportOptionsCsv() {
+  syncOptionsFromInputs();
+  const rows = estimateOptions.map(o => `"${String(o.label).replace(/"/g, '""')}",${o.price}`);
+  const csv = 'Service Name,Price\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'estimate-options.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setOptionsStatus(msg) {
+  const el = document.getElementById('options-status');
+  if (el) el.textContent = msg;
 }
