@@ -14,8 +14,8 @@
     html, body {
       width: 100%;
       height: 100%;
-      background: #111;
-      color: #f0f0f0;
+      background: #f5f5f5;
+      color: #111;
       font-family: sans-serif;
       display: flex;
       flex-direction: column;
@@ -27,15 +27,15 @@
       align-items: center;
       gap: 20px;
       padding: 18px 32px;
-      background: #1a1a1a;
+      background: #fff;
       border-bottom: 2px solid #c0392b;
       flex-shrink: 0;
     }
 
     #back-btn {
       background: none;
-      border: 2px solid #555;
-      color: #ccc;
+      border: 2px solid #ddd;
+      color: #555;
       padding: 8px 18px;
       border-radius: 6px;
       font-size: 1rem;
@@ -44,8 +44,8 @@
     }
 
     #back-btn:hover {
-      border-color: #fff;
-      color: #fff;
+      border-color: #333;
+      color: #111;
     }
 
     header h1 {
@@ -66,7 +66,7 @@
 
     .prompt {
       font-size: 1.4rem;
-      color: #aaa;
+      color: #666;
       letter-spacing: 0.03em;
     }
 
@@ -83,9 +83,9 @@
       font-size: 1.8rem;
       font-weight: bold;
       letter-spacing: 0.04em;
-      color: #fff;
-      background: #1a1a1a;
-      border: 2px solid #2a2a2a;
+      color: #111;
+      background: #fff;
+      border: 2px solid #e0e0e0;
       border-radius: 14px;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s, transform 0.1s;
@@ -93,7 +93,7 @@
     }
 
     .vehicle-btn:hover {
-      background: #222;
+      background: #f0f0f0;
       border-color: #c0392b;
     }
 
@@ -112,10 +112,10 @@
   <main>
     <p class="prompt">What is your vehicle?</p>
     <div class="vehicle-grid">
-      <button class="vehicle-btn" onclick="selectCompany('Company_1')">Company 1</button>
-      <button class="vehicle-btn" onclick="selectCompany('Company_2')">Company 2</button>
-      <button class="vehicle-btn" onclick="selectCompany('Company_3')">Company 3</button>
-      <button class="vehicle-btn" onclick="selectCompany('Company_4')">Company 4</button>
+      <button class="vehicle-btn" onclick="selectCompany('Ford')">Ford</button>
+      <button class="vehicle-btn" onclick="selectCompany('Ram')">Ram</button>
+      <button class="vehicle-btn" onclick="selectCompany('Mercedes')">Mercedes</button>
+      <button class="vehicle-btn" onclick="selectCompany('Chevy')">Chevy</button>
     </div>
   </main>
 

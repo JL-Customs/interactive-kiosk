@@ -27,8 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupCsvTab();
   loadSettingsFromServer();
   pushLocalSettingsToServer();
-  pushLocalEstimateOptionsToServer();
-  loadEstimateOptionsFromServer();
+  pushAllToServer();
+  loadAllEstimateOptions();
+  setupPartsLibrary();
   setupManageGallery();
   loadPhotos();
   checkServerStatus();
@@ -52,6 +53,7 @@ function setupNavigation() {
       if (section) {
         section.classList.add('active');
       }
+      if (sectionId === 'parts') renderPartsLibrary();
     });
   });
 }
@@ -658,36 +660,33 @@ function setupEventListeners() {
 }
 
 // ── Estimate Options (CSV tab) ─────────────────────────────────
-// estimateOptions shape: [{ category: string, items: [{ label, price }] }]
+// estimateOptions      = current company's [{ category, items }]
+// estimateOptionsByCompany = { Company_1: [...], Company_2: [...] }
 
 let estimateOptions = [];
-let currentCompany = 'Company_1';
+let estimateOptionsByCompany = {};
+let currentCompany = null;
 
 function setupCsvTab() {
   const dropZone = document.getElementById('csv-upload-area');
   const fileInput = document.getElementById('csv-file-input');
-  const companyInput = document.getElementById('company-name-input');
-
-  companyInput.addEventListener('change', () => {
-    currentCompany = companyInput.value.trim() || 'Company_1';
-  });
 
   dropZone.addEventListener('click', () => fileInput.click());
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('drag-over');
-  });
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) parseAndLoadCsv(e.dataTransfer.files[0]);
+    Array.from(e.dataTransfer.files).forEach(f => {
+      if (f.name.toLowerCase().endsWith('.csv') || f.type === 'text/csv') parseAndLoadCsv(f);
+    });
   });
   fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) parseAndLoadCsv(fileInput.files[0]);
+    Array.from(fileInput.files).forEach(f => parseAndLoadCsv(f));
     fileInput.value = '';
   });
 
+  document.getElementById('add-company-btn').addEventListener('click', addCompany);
   document.getElementById('add-option-btn').addEventListener('click', addCategory);
   document.getElementById('save-options-btn').addEventListener('click', saveEstimateOptions);
   document.getElementById('export-csv-btn').addEventListener('click', exportOptionsCsv);
@@ -747,61 +746,46 @@ function normalizeEstimateOptions(data) {
 }
 
 function parseAndLoadCsv(file) {
-  // Auto-detect company name from filename (strip .csv extension)
-  const detectedCompany = file.name.replace(/\.csv$/i, '');
-  if (detectedCompany) {
-    currentCompany = detectedCompany;
-    const companyInput = document.getElementById('company-name-input');
-    if (companyInput) companyInput.value = currentCompany;
-  }
-
+  const company = file.name.replace(/\.csv$/i, '') || 'New Company';
+  const isReplace = company in estimateOptionsByCompany;
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     const parsed = parseCsvText(e.target.result);
-    if (parsed.length === 0) {
-      setOptionsStatus('No valid rows found. Expected: Category, Item, Price');
-      return;
-    }
-    estimateOptions = parsed;
-    renderOptionsTable();
+    if (parsed.length === 0) { setOptionsStatus(`No valid rows found in ${file.name}.`); return; }
+    estimateOptionsByCompany[company] = parsed;
+    switchToCompany(company);
+    await saveAllToLocalStore();
+    try {
+      await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(company)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options: parsed }),
+      });
+    } catch { /* server offline */ }
     const total = parsed.reduce((s, c) => s + c.items.length, 0);
-    setOptionsStatus(`Imported ${total} item(s) across ${parsed.length} category/categories from ${file.name}.`);
+    setOptionsStatus(`${isReplace ? 'Replaced' : 'Imported'} ${total} item(s) for "${company}".`);
   };
   reader.readAsText(file);
 }
 
 function parseAndLoadCsvAuto(file) {
+  const company = file.name.replace(/\.csv$/i, '') || currentCompany || 'New Company';
+  const isReplace = company in estimateOptionsByCompany;
   const reader = new FileReader();
   reader.onload = async (e) => {
     const parsed = parseCsvText(e.target.result);
     if (parsed.length === 0) return;
-
-    // Merge categories — append new items to existing categories
-    for (const incoming of parsed) {
-      const existing = estimateOptions.find(c => c.category.toLowerCase() === incoming.category.toLowerCase());
-      if (existing) {
-        const existingLabels = new Set(existing.items.map(i => i.label.toLowerCase()));
-        incoming.items.filter(i => !existingLabels.has(i.label.toLowerCase()))
-          .forEach(i => existing.items.push(i));
-      } else {
-        estimateOptions.push(incoming);
-      }
-    }
-    renderOptionsTable();
-
-    if (window.localStore) {
-      await window.localStore.saveEstimateOptions(estimateOptions).catch(() => {});
-    }
+    estimateOptionsByCompany[company] = parsed;
+    renderCompanyList();
+    if (company === currentCompany) { estimateOptions = parsed; renderOptionsTable(); }
+    await saveAllToLocalStore();
     try {
-      await fetch(`${serverUrl}/api/estimate-options`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ options: estimateOptions }),
+      await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(company)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options: parsed }),
       });
-    } catch { /* server offline — saved locally */ }
-
+    } catch { /* server offline */ }
     const total = parsed.reduce((s, c) => s + c.items.length, 0);
-    setOptionsStatus(`CSV imported: ${total} item(s) from ${file.name} merged into estimate options.`);
+    setOptionsStatus(`${isReplace ? 'Replaced' : 'Imported'} ${total} item(s) from ${file.name}.`);
   };
   reader.readAsText(file);
 }
@@ -826,6 +810,10 @@ function syncOptionsFromInputs() {
       estimateOptions[c].items[i].requires = val ? val.split('|').map(r => r.trim()).filter(Boolean) : [];
     }
   });
+  document.querySelectorAll('.opt-type-select').forEach(input => {
+    const c = Number(input.dataset.cat);
+    if (estimateOptions[c]) estimateOptions[c].type = input.value;
+  });
 }
 
 function renderOptionsTable() {
@@ -837,10 +825,17 @@ function renderOptionsTable() {
 
   let html = '';
   estimateOptions.forEach((cat, catIdx) => {
+    const catType = cat.type || 'multiple';
     html += `
       <tr class="category-header-row">
-        <td colspan="3">
+        <td colspan="2">
           <input type="text" class="opt-category-input" data-cat="${catIdx}" value="${escHtml(cat.category)}" placeholder="Category name">
+        </td>
+        <td>
+          <select class="opt-type-select" data-cat="${catIdx}">
+            <option value="multiple"${catType === 'multiple' ? ' selected' : ''}>Multiple</option>
+            <option value="single"${catType === 'single' ? ' selected' : ''}>Single</option>
+          </select>
         </td>
         <td>
           <button class="btn-delete-single" onclick="removeCategory(${catIdx})">Remove Category</button>
@@ -880,7 +875,7 @@ function escHtml(str) {
 
 function addCategory() {
   syncOptionsFromInputs();
-  estimateOptions.push({ category: 'New Category', items: [] });
+  estimateOptions.push({ category: 'New Category', type: 'multiple', items: [] });
   renderOptionsTable();
 }
 
@@ -906,83 +901,135 @@ function removeItem(catIdx, itemIdx) {
   }
 }
 
+// ── Company panel ──────────────────────────────────────────────
+
+function renderCompanyList() {
+  const list = document.getElementById('company-list');
+  const companies = Object.keys(estimateOptionsByCompany).sort();
+
+  if (companies.length === 0) {
+    list.innerHTML = '<p class="company-empty">No companies yet.<br>Import a CSV or click + Add.</p>';
+    return;
+  }
+
+  list.innerHTML = companies.map(name => {
+    const opts = estimateOptionsByCompany[name] || [];
+    const count = opts.reduce((s, c) => s + (c.items?.length || 0), 0);
+    const active = name === currentCompany ? 'active' : '';
+    return `
+      <div class="company-item ${active}" onclick="switchToCompany('${escHtml(name)}')">
+        <div class="company-item-info">
+          <span class="company-item-name">${escHtml(name)}</span>
+          <span class="company-item-count">${count} item${count !== 1 ? 's' : ''}</span>
+        </div>
+        <button class="company-item-delete" onclick="event.stopPropagation();deleteCompany('${escHtml(name)}')" title="Remove">&times;</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function switchToCompany(name) {
+  if (currentCompany && currentCompany !== name) syncOptionsFromInputs();
+  currentCompany = name;
+  estimateOptions = estimateOptionsByCompany[name] || [];
+  renderCompanyList();
+  renderOptionsTable();
+  setOptionsStatus('');
+}
+
+function addCompany() {
+  const name = prompt('Company name:');
+  if (!name?.trim()) return;
+  const trimmed = name.trim();
+  estimateOptionsByCompany[trimmed] = [];
+  switchToCompany(trimmed);
+}
+
+function deleteCompany(name) {
+  if (!confirm(`Remove "${name}"? This cannot be undone.`)) return;
+  delete estimateOptionsByCompany[name];
+  if (currentCompany === name) {
+    const remaining = Object.keys(estimateOptionsByCompany).sort();
+    currentCompany = remaining[0] || null;
+    estimateOptions = currentCompany ? (estimateOptionsByCompany[currentCompany] || []) : [];
+  }
+  renderCompanyList();
+  renderOptionsTable();
+  saveAllToLocalStore();
+}
+
+async function saveAllToLocalStore() {
+  if (!window.localStore) return;
+  await window.localStore.saveEstimateOptions(estimateOptionsByCompany).catch(() => {});
+}
+
+async function loadAllEstimateOptions() {
+  // Load from server
+  try {
+    const res = await fetch(`${serverUrl}/api/estimate-options`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        for (const [company, opts] of Object.entries(data)) {
+          estimateOptionsByCompany[company] = normalizeEstimateOptions(opts);
+        }
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Merge local store (fills in anything missing from server)
+  if (window.localStore) {
+    const local = await window.localStore.loadEstimateOptions().catch(() => null);
+    if (local && typeof local === 'object' && !Array.isArray(local)) {
+      for (const [company, opts] of Object.entries(local)) {
+        if (!estimateOptionsByCompany[company]) {
+          estimateOptionsByCompany[company] = normalizeEstimateOptions(opts);
+        }
+      }
+    }
+  }
+
+  renderCompanyList();
+  const first = Object.keys(estimateOptionsByCompany).sort()[0];
+  if (first) switchToCompany(first);
+  renderPartsLibrary();
+}
+
+async function pushAllToServer() {
+  if (!window.localStore) return;
+  const local = await window.localStore.loadEstimateOptions().catch(() => null);
+  if (!local || typeof local !== 'object' || Array.isArray(local)) return;
+  for (const [company, opts] of Object.entries(local)) {
+    if (!opts || opts.length === 0) continue;
+    fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(company)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: opts }),
+    }).catch(() => {});
+  }
+}
+
 async function saveEstimateOptions() {
+  if (!currentCompany) { setOptionsStatus('Select a company first.'); return; }
   syncOptionsFromInputs();
-  currentCompany = (document.getElementById('company-name-input')?.value.trim()) || currentCompany;
 
   const valid = estimateOptions
-    .map(cat => ({
-      ...cat,
-      category: cat.category.trim(),
-      items: cat.items.filter(i => i.label.trim() && !isNaN(i.price)),
-    }))
+    .map(cat => ({ ...cat, category: cat.category.trim(), items: cat.items.filter(i => i.label.trim() && !isNaN(i.price)) }))
     .filter(cat => cat.category && cat.items.length > 0);
 
-  // Save to local store keyed by company
-  if (window.localStore) {
-    const allLocal = await window.localStore.loadEstimateOptions().catch(() => ({}));
-    const stored = (allLocal && !Array.isArray(allLocal)) ? allLocal : {};
-    stored[currentCompany] = valid;
-    await window.localStore.saveEstimateOptions(stored).catch(() => {});
-  }
+  estimateOptionsByCompany[currentCompany] = valid;
+  await saveAllToLocalStore();
+  renderCompanyList();
 
   try {
     const res = await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(currentCompany)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ options: valid }),
     });
     const total = valid.reduce((s, c) => s + c.items.length, 0);
-    if (res.ok) {
-      setOptionsStatus(`Saved ${total} item(s) for "${currentCompany}".`);
-    } else {
-      setOptionsStatus('Saved locally. Server returned an error.');
-    }
+    setOptionsStatus(res.ok ? `Saved ${total} item(s) for "${currentCompany}".` : 'Saved locally. Server returned an error.');
   } catch {
     setOptionsStatus('Saved locally. Server is offline — will push on next startup.');
   }
-}
-
-async function loadEstimateOptionsFromServer() {
-  try {
-    const res = await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(currentCompany)}`);
-    if (res.ok) {
-      const data = await res.json();
-      const normalized = normalizeEstimateOptions(data);
-      if (normalized.length > 0) {
-        estimateOptions = normalized;
-        renderOptionsTable();
-        return;
-      }
-    }
-  } catch { /* fall through to local */ }
-
-  if (window.localStore) {
-    const allLocal = await window.localStore.loadEstimateOptions().catch(() => null);
-    const companyData = (allLocal && !Array.isArray(allLocal)) ? allLocal[currentCompany] : allLocal;
-    const normalized = normalizeEstimateOptions(companyData);
-    if (normalized.length > 0) {
-      estimateOptions = normalized;
-      renderOptionsTable();
-    }
-  }
-}
-
-async function pushLocalEstimateOptionsToServer() {
-  if (!window.localStore) return;
-  try {
-    const allLocal = await window.localStore.loadEstimateOptions().catch(() => null);
-    if (!allLocal) return;
-    const companies = (allLocal && !Array.isArray(allLocal)) ? allLocal : { [currentCompany]: allLocal };
-    for (const [company, options] of Object.entries(companies)) {
-      if (!options || options.length === 0) continue;
-      await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(company)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ options }),
-      }).catch(() => {});
-    }
-  } catch { /* server offline */ }
 }
 
 function exportOptionsCsv() {
@@ -1009,4 +1056,231 @@ function exportOptionsCsv() {
 function setOptionsStatus(msg) {
   const el = document.getElementById('options-status');
   if (el) el.textContent = msg;
+}
+
+// ── Parts Library ──────────────────────────────────────────────
+
+let partsSort = { col: 'label', dir: 1 };
+let partsGrouped = []; // [{ label, entries: [{ company, category, price, requires }] }]
+
+function setupPartsLibrary() {
+  document.getElementById('parts-search').addEventListener('input', renderPartsLibrary);
+  document.getElementById('parts-company-filter').addEventListener('change', renderPartsLibrary);
+  document.querySelectorAll('#parts-table .sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      partsSort.dir = partsSort.col === col ? partsSort.dir * -1 : 1;
+      partsSort.col = col;
+      renderPartsLibrary();
+    });
+  });
+}
+
+function renderPartsLibrary() {
+  const search = (document.getElementById('parts-search')?.value || '').toLowerCase().trim();
+  const companyFilter = document.getElementById('parts-company-filter')?.value || '';
+
+  // Build flat rows from all companies
+  const allRows = [];
+  for (const [company, cats] of Object.entries(estimateOptionsByCompany)) {
+    for (const cat of (cats || [])) {
+      for (const item of (cat.items || [])) {
+        allRows.push({
+          company,
+          category: cat.category || '',
+          label: item.label || '',
+          price: item.price ?? 0,
+          requires: Array.isArray(item.requires) ? item.requires : [],
+        });
+      }
+    }
+  }
+
+  // Sync company filter dropdown
+  const filterEl = document.getElementById('parts-company-filter');
+  if (filterEl) {
+    const companies = [...new Set(allRows.map(r => r.company))].sort();
+    filterEl.innerHTML = '<option value="">All Companies</option>' +
+      companies.map(c => `<option value="${escHtml(c)}"${c === companyFilter ? ' selected' : ''}>${escHtml(c)}</option>`).join('');
+  }
+
+  // Filter by company and search
+  let rows = allRows.filter(row => {
+    if (companyFilter && row.company !== companyFilter) return false;
+    if (search && !`${row.company} ${row.category} ${row.label}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  // Sort flat rows (determines order within groups and group order)
+  rows.sort((a, b) => {
+    if (partsSort.col === 'price') return (a.price - b.price) * partsSort.dir;
+    return String(a[partsSort.col]).localeCompare(String(b[partsSort.col])) * partsSort.dir;
+  });
+
+  // Group by normalized item label; preserve sorted order
+  const groupMap = new Map();
+  for (const row of rows) {
+    const key = row.label.trim().toLowerCase();
+    if (!groupMap.has(key)) groupMap.set(key, { label: row.label, entries: [] });
+    groupMap.get(key).entries.push(row);
+  }
+  for (const group of groupMap.values()) {
+    group.entries.sort((a, b) => a.company.localeCompare(b.company));
+  }
+  partsGrouped = [...groupMap.values()];
+
+  // Stats
+  const statsEl = document.getElementById('parts-stats');
+  if (statsEl) {
+    const filtered = search || companyFilter;
+    statsEl.innerHTML =
+      `<span class="parts-stat">${Object.keys(estimateOptionsByCompany).length} companies</span>` +
+      `<span class="parts-stat">${allRows.length} total entries</span>` +
+      (filtered
+        ? `<span class="parts-stat parts-stat-filtered">${partsGrouped.length} item${partsGrouped.length !== 1 ? 's' : ''} shown</span>`
+        : `<span class="parts-stat">${partsGrouped.length} unique items</span>`);
+  }
+
+  const tbody = document.getElementById('parts-tbody');
+  if (!tbody) return;
+
+  if (partsGrouped.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#999;">${
+      allRows.length === 0 ? 'No parts loaded. Upload CSVs in Estimate Options.' : 'No items match your search.'
+    }</td></tr>`;
+    updatePartsSortArrows();
+    return;
+  }
+
+  tbody.innerHTML = partsGrouped.map((group, idx) => {
+    const first = group.entries[0];
+    const multi = group.entries.length > 1;
+    const companyCell = multi
+      ? `<select class="parts-company-sel" data-group="${idx}">
+           ${group.entries.map((e, i) => `<option value="${i}">${escHtml(e.company)}</option>`).join('')}
+         </select>`
+      : escHtml(first.company);
+
+    return `<tr>
+      <td>${companyCell}</td>
+      <td class="parts-cat-cell">${escHtml(first.category)}</td>
+      <td>${escHtml(group.label)}</td>
+      <td class="parts-price-cell">$${partsFormatPrice(first.price)}</td>
+      <td class="parts-req-cell">${partsReqTags(first.requires)}</td>
+      <td><button class="btn-delete-single parts-edit-btn" onclick="editPartsRow(${idx})">Edit</button></td>
+    </tr>`;
+  }).join('');
+
+  // Wire company dropdowns
+  tbody.querySelectorAll('.parts-company-sel').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const entry = partsGrouped[Number(sel.dataset.group)].entries[Number(sel.value)];
+      const tr = sel.closest('tr');
+      tr.querySelector('.parts-cat-cell').textContent = entry.category;
+      tr.querySelector('.parts-price-cell').textContent = '$' + partsFormatPrice(entry.price);
+      tr.querySelector('.parts-req-cell').innerHTML = partsReqTags(entry.requires);
+    });
+  });
+
+  updatePartsSortArrows();
+}
+
+function partsFormatPrice(price) {
+  return Number(price).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function partsReqTags(requires) {
+  if (!requires || requires.length === 0) return '';
+  return requires.map(r => `<span class="parts-req-tag">${escHtml(r)}</span>`).join('');
+}
+
+function updatePartsSortArrows() {
+  document.querySelectorAll('#parts-table .sortable').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = th.dataset.col === partsSort.col ? (partsSort.dir === 1 ? ' ↑' : ' ↓') : '';
+  });
+}
+
+function editPartsRow(groupIdx) {
+  const group = partsGrouped[groupIdx];
+  const tbody = document.getElementById('parts-tbody');
+  const tr = tbody.querySelectorAll('tr')[groupIdx];
+
+  // Use whichever company is currently selected in the dropdown (or 0 for single)
+  const sel = tr.querySelector('.parts-company-sel');
+  const entryIdx = sel ? Number(sel.value) : 0;
+  const entry = group.entries[entryIdx];
+
+  tr.dataset.origCompany = entry.company;
+  tr.dataset.origCategory = entry.category;
+  tr.dataset.origLabel = entry.label;
+
+  tr.innerHTML = `
+    <td><span class="parts-edit-company">${escHtml(entry.company)}</span></td>
+    <td><input class="parts-edit-input" id="edit-cat-${groupIdx}" value="${escHtml(entry.category)}"></td>
+    <td><input class="parts-edit-input" id="edit-label-${groupIdx}" value="${escHtml(entry.label)}"></td>
+    <td><input class="parts-edit-input parts-edit-price" id="edit-price-${groupIdx}" type="number" value="${entry.price}" min="0" step="1"></td>
+    <td><input class="parts-edit-input" id="edit-req-${groupIdx}" value="${escHtml(entry.requires.join('|'))}" placeholder="Item 1|Item 2"></td>
+    <td>
+      <div class="parts-row-actions">
+        <button class="btn btn-primary parts-save-btn" onclick="savePartsEdit(${groupIdx})">Save</button>
+        <button class="btn parts-cancel-btn" onclick="renderPartsLibrary()">Cancel</button>
+      </div>
+    </td>
+  `;
+
+  document.getElementById(`edit-label-${groupIdx}`).focus();
+}
+
+async function savePartsEdit(groupIdx) {
+  const tbody = document.getElementById('parts-tbody');
+  const tr = tbody.querySelectorAll('tr')[groupIdx];
+
+  const origCompany = tr.dataset.origCompany;
+  const origCategory = tr.dataset.origCategory;
+  const origLabel = tr.dataset.origLabel;
+
+  const newCategory = document.getElementById(`edit-cat-${groupIdx}`).value.trim();
+  const newLabel = document.getElementById(`edit-label-${groupIdx}`).value.trim();
+  const newPrice = Number(document.getElementById(`edit-price-${groupIdx}`).value);
+  const reqRaw = document.getElementById(`edit-req-${groupIdx}`).value.trim();
+  const newRequires = reqRaw ? reqRaw.split('|').map(r => r.trim()).filter(Boolean) : [];
+
+  if (!newLabel || !newCategory) {
+    alert('Item name and category cannot be empty.');
+    return;
+  }
+
+  const cats = estimateOptionsByCompany[origCompany];
+  if (!cats) { renderPartsLibrary(); return; }
+
+  const oldCatIdx = cats.findIndex(c => c.category === origCategory);
+  if (oldCatIdx === -1) { renderPartsLibrary(); return; }
+
+  const oldItemIdx = cats[oldCatIdx].items.findIndex(i => i.label === origLabel);
+  if (oldItemIdx === -1) { renderPartsLibrary(); return; }
+
+  if (newCategory === origCategory) {
+    cats[oldCatIdx].items[oldItemIdx] = { label: newLabel, price: newPrice, requires: newRequires };
+  } else {
+    cats[oldCatIdx].items.splice(oldItemIdx, 1);
+    if (cats[oldCatIdx].items.length === 0) cats.splice(oldCatIdx, 1);
+    let targetCat = cats.find(c => c.category === newCategory);
+    if (!targetCat) {
+      targetCat = { category: newCategory, items: [] };
+      cats.push(targetCat);
+    }
+    targetCat.items.push({ label: newLabel, price: newPrice, requires: newRequires });
+  }
+
+  await saveAllToLocalStore();
+  try {
+    await fetch(`${serverUrl}/api/estimate-options/${encodeURIComponent(origCompany)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: cats }),
+    });
+  } catch { /* server offline */ }
+
+  renderPartsLibrary();
+  setOptionsStatus(`Saved "${newLabel}" in ${origCompany}.`);
 }

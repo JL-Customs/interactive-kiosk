@@ -387,13 +387,122 @@ section h2 {
   box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
 }
 
-footer {
-  background: #222;
-  color: #999;
-  text-align: center;
-  padding: 0.75rem;
-  margin-top: auto;
+
+/* ── CSV Manager two-panel layout ── */
+.csv-manager {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.company-panel {
+  width: 210px;
+  flex-shrink: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.company-panel-header {
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
   font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.company-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 420px;
+}
+
+.company-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  gap: 8px;
+}
+
+.company-item:hover {
+  background: #f5f5f5;
+}
+
+.company-item.active {
+  background: #eef4ff;
+  border-left-color: #0066cc;
+}
+
+.company-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.company-item-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #222;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.company-item-count {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.company-item-delete {
+  background: none;
+  border: none;
+  color: #bbb;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.company-item-delete:hover {
+  color: #c33;
+}
+
+.company-empty {
+  padding: 1rem;
+  color: #aaa;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.company-add-btn {
+  margin: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.company-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .csv-drop-zone {
@@ -439,6 +548,17 @@ footer {
   border: 1px solid #ccc;
   border-radius: 3px;
   font-size: 0.9rem;
+}
+
+.opt-type-select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  background: #f0f0f0;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
 }
 
 .opt-category-input {
@@ -513,4 +633,156 @@ footer {
   background: #0066cc;
   width: 0%;
   transition: width 0.3s ease;
+}
+
+/* ── Parts Library ── */
+.parts-controls {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.parts-search-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+
+.parts-search-input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.parts-company-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.9rem;
+  min-width: 180px;
+  background: white;
+}
+
+.parts-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.parts-stat {
+  background: #f0f0f0;
+  color: #555;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 99px;
+  border: 1px solid #e0e0e0;
+}
+
+.parts-stat-filtered {
+  background: #eef4ff;
+  color: #0066cc;
+  border-color: #c0d8f8;
+  font-weight: 600;
+}
+
+.parts-table .sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.parts-table .sortable:hover {
+  background: #eaeaea;
+}
+
+.parts-req-tag {
+  display: inline-block;
+  background: #f0f4ff;
+  color: #0052a3;
+  border: 1px solid #cce0ff;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  margin: 1px 2px;
+}
+
+.parts-requires {
+  max-width: 220px;
+}
+
+.parts-edit-btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  white-space: nowrap;
+}
+
+.parts-edit-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+.parts-edit-input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.parts-edit-price {
+  width: 90px;
+}
+
+.parts-edit-company {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #0052a3;
+}
+
+.parts-row-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.parts-save-btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+  margin: 0;
+}
+
+.parts-cancel-btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+  margin: 0;
+  background: #e8e8e8;
+  color: #333;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.parts-cancel-btn:hover {
+  background: #d0d0d0;
+}
+
+.parts-company-sel {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #b0c8f0;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  background: #eef4ff;
+  color: #0052a3;
+  cursor: pointer;
+  max-width: 160px;
+}
+
+.parts-company-sel:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
 }

@@ -8,16 +8,16 @@
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>Admin Dashboard</h1>
-    </header>
+    <!-- <header>
+      <h1>Admin Dashboard</h1> 
+    </header> -->
 
     <nav class="navbar">
       <button class="nav-btn active" data-section="dashboard">Dashboard</button>
-      <button class="nav-btn" data-section="upload">Upload Photos</button>
       <button class="nav-btn" data-section="manage">Manage Gallery</button>
+      <button class="nav-btn" data-section="csv">Manage Data</button>
+      <button class="nav-btn" data-section="parts">Parts Library</button>
       <button class="nav-btn" data-section="settings">Settings</button>
-      <button class="nav-btn" data-section="csv">Estimate Options</button>
     </nav>
 
     <main id="content">
@@ -41,12 +41,12 @@
         <button class="btn btn-primary" id="refresh-btn">Refresh Data</button>
       </section>
 
-      <!-- Upload Section -->
-      <section id="upload" class="section">
-        <h2>Upload Photos</h2>
+      <!-- Manage Section -->
+      <section id="manage" class="section">
+        <h2>Manage Gallery</h2>
         <div class="upload-area" id="upload-area">
-          <p>Drag and drop photos or CSV files here, or click to select</p>
-          <p style="font-size:0.8rem;color:#888;margin-top:4px;">Images are added to the gallery &mdash; CSV files update estimate options</p>
+          <p>Drag and drop photos here, or click to select</p>
+          <!-- <p style="font-size:0.8rem;color:#888;margin-top:4px;">Images are added to the gallery &mdash; CSV files update estimate options</p> -->
           <input type="file" id="file-input" multiple accept="image/*,.csv,text/csv" style="display: none;">
         </div>
         <div id="selected-files" class="selected-files" aria-live="polite">
@@ -54,13 +54,8 @@
           <ul id="selected-files-list" class="selected-files-list"></ul>
         </div>
         <div id="upload-progress"></div>
-        <button class="btn btn-primary" id="upload-btn">Upload Selected</button>
-      </section>
-
-      <!-- Manage Section -->
-      <section id="manage" class="section">
-        <h2>Manage Gallery</h2>
         <div class="manage-controls">
+          <button class="btn btn-primary" id="upload-btn">Upload Selected</button>
           <button class="btn btn-primary" id="select-all-btn">Select All</button>
           <button class="btn btn-danger" id="delete-selected-btn" disabled>Delete Selected</button>
           <button class="btn btn-primary" id="update-order-btn" disabled>Update Order</button>
@@ -99,45 +94,79 @@
           <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
         </div>
       </section>
-      <!-- Estimate Options Section -->
-      <section id="csv" class="section">
-        <h2>Estimate Options</h2>
-        <p style="color:#666;font-size:0.85rem;margin-bottom:1rem;">
-          Define the services shown on the kiosk estimate page. Upload a CSV (columns: Service Name, Price) or edit manually.
-        </p>
-        <div class="form-group" style="max-width:320px;margin-bottom:1rem;">
-          <label for="company-name-input">Company / Vehicle Brand:</label>
-          <input type="text" id="company-name-input" placeholder="e.g. Company_1" value="Company_1">
+      <!-- Parts Library Section -->
+      <section id="parts" class="section">
+        <h2>Parts Library</h2>
+        <div class="parts-controls">
+          <input type="text" id="parts-search" class="parts-search-input" placeholder="Search items or categories...">
+          <select id="parts-company-filter" class="parts-company-select">
+            <option value="">All Companies</option>
+          </select>
         </div>
-        <div class="csv-drop-zone" id="csv-upload-area">
-          <p>Drop a CSV file here or click to import</p>
-          <p style="font-size:0.8rem;color:#aaa;margin-top:4px;">Format: two columns — Service Name, Price</p>
-          <input type="file" id="csv-file-input" accept=".csv,text/csv" style="display:none;">
-        </div>
-        <table class="photo-table" id="options-table" style="margin-top:1rem;">
+        <div class="parts-stats" id="parts-stats"></div>
+        <table class="photo-table parts-table" id="parts-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Price ($)</th>
-              <th>Requires (pipe-separated)</th>
+              <th class="sortable" data-col="company">Company <span class="sort-arrow"></span></th>
+              <th class="sortable" data-col="category">Category <span class="sort-arrow"></span></th>
+              <th class="sortable" data-col="label">Item <span class="sort-arrow"></span></th>
+              <th class="sortable" data-col="price">Price <span class="sort-arrow"></span></th>
+              <th>Requires</th>
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody id="options-tbody">
-            <tr><td colspan="4" style="text-align:center;padding:1.5rem;color:#999;">No options yet. Import a CSV or add a category.</td></tr>
+          <tbody id="parts-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:2rem;color:#999;">Loading parts...</td></tr>
           </tbody>
         </table>
-        <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <button class="btn btn-primary" id="add-option-btn">+ Add Category</button>
-          <button class="btn btn-primary" id="save-options-btn">Save &amp; Push to Server</button>
-          <button class="btn csv-export-btn" id="export-csv-btn">Export CSV</button>
+      </section>
+
+      <!-- Estimate Options Section -->
+      <section id="csv" class="section">
+        <h2>Estimate Options</h2>
+        <div class="csv-manager">
+
+          <!-- Left: company list -->
+          <div class="company-panel">
+            <div class="company-panel-header">Companies</div>
+            <div class="company-list" id="company-list">
+              <p class="company-empty">No companies yet.</p>
+            </div>
+            <button class="btn btn-primary company-add-btn" id="add-company-btn">+ Add Company</button>
+          </div>
+
+          <!-- Right: editor -->
+          <div class="company-editor">
+            <div class="csv-drop-zone" id="csv-upload-area">
+              <p>Drop CSV files here or click to import</p>
+              <p style="font-size:0.8rem;color:#aaa;margin-top:4px;">Format: Category, Item, Price, Requires &dash; filename becomes the company name</p>
+              <input type="file" id="csv-file-input" accept=".csv,text/csv" multiple style="display:none;">
+            </div>
+            <table class="photo-table" id="options-table" style="margin-top:1rem;">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Price ($)</th>
+                  <th>Requires (pipe-separated)</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="options-tbody">
+                <tr><td colspan="4" style="text-align:center;padding:1.5rem;color:#999;">Select a company to edit its options.</td></tr>
+              </tbody>
+            </table>
+            <div class="editor-actions">
+              <button class="btn btn-primary" id="add-option-btn">+ Add Category</button>
+              <button class="btn btn-primary" id="save-options-btn">Save &amp; Push to Server</button>
+              <button class="btn csv-export-btn" id="export-csv-btn">Export CSV</button>
+            </div>
+            <p id="options-status" style="margin-top:0.5rem;font-size:0.85rem;color:#666;min-height:1.2em;"></p>
+          </div>
+
         </div>
-        <p id="options-status" style="margin-top:0.5rem;font-size:0.85rem;color:#666;min-height:1.2em;"></p>
       </section>
     </main>
 
-    <footer>
-    </footer>
   </div>
 
   <script src="script.js"></script>
