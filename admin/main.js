@@ -1,6 +1,35 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
+
+const UPDATE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+autoUpdater.autoDownload = false;
+
+autoUpdater.on('update-available', (i) => {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Update Available',
+    message: `Version ${i.version} is available. Download and install now?`,
+    buttons: ['Update', 'Later'],
+    defaultId: 0
+  }).then(({ response }) => {
+    if (response === 0) autoUpdater.downloadUpdate();
+  });
+});
+
+autoUpdater.on('update-downloaded', () => {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Update Ready',
+    message: 'Update downloaded. The app will restart to apply it.',
+    buttons: ['Restart Now'],
+    defaultId: 0
+  }).then(() => autoUpdater.quitAndInstall(false, true));
+});
+
+autoUpdater.on('error', (e) => console.error(`Updater error: ${e.message}`));
 
 let mainWindow;
 let storeDir;
@@ -105,6 +134,7 @@ app.on('ready', () => {
   setupStore();
   Menu.setApplicationMenu(null);
   createWindow();
+  autoUpdater.checkForUpdates().catch(() => {});
 });
 
 app.on('window-all-closed', () => {

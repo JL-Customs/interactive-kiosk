@@ -907,6 +907,9 @@ function renderCompanyList() {
   const list = document.getElementById('company-list');
   const companies = Object.keys(estimateOptionsByCompany).sort();
 
+  const csvCountEl = document.getElementById('csv-count');
+  if (csvCountEl) csvCountEl.textContent = companies.length;
+
   if (companies.length === 0) {
     list.innerHTML = '<p class="company-empty">No companies yet.<br>Import a CSV or click + Add.</p>';
     return;
