@@ -84,6 +84,7 @@ async function loadPhotos() {
           return orderA - orderB;
         });
 
+      window.appLog?.write(`Server: fetched ${newPhotos.length} photo(s)`);
       // Persist to disk cache in the background
       cachePhotoData(newPhotos);
 
@@ -97,7 +98,7 @@ async function loadPhotos() {
       return photos;
     }
   } catch (error) {
-    console.warn('Could not reach server, showing cached photos.');
+    window.appLog?.write(`Server: unreachable — showing cached photos (${error.message})`);
   }
 }
 
@@ -105,22 +106,30 @@ async function cachePhotoData(photoList) {
   if (!window.photoCache) return;
   try {
     await window.photoCache.saveMetadata(photoList);
+    window.appLog?.write(`Cache: saved metadata for ${photoList.length} photo(s)`);
     for (const photo of photoList) {
       if (photo.filename) {
-        window.photoCache.downloadPhoto(photo.url, photo.filename).catch(() => {});
+        window.photoCache.downloadPhoto(photo.url, photo.filename)
+          .then(localUrl => window.appLog?.write(`Cache: downloaded ${photo.filename} -> ${localUrl ? 'ok' : 'failed'}`))
+          .catch(err => window.appLog?.write(`Cache: download error for ${photo.filename}: ${err.message}`));
       }
     }
   } catch (err) {
-    console.error('Error caching photos:', err);
+    window.appLog?.write(`Cache: saveMetadata error: ${err.message}`);
   }
 }
 
 async function loadCachedPhotos() {
-  if (!window.photoCache) return [];
+  if (!window.photoCache) { window.appLog?.write('Cache: photoCache API not available'); return []; }
   try {
     const cached = await window.photoCache.loadMetadata();
-    if (!cached || cached.length === 0) return [];
+    if (!cached || cached.length === 0) {
+      window.appLog?.write('Cache: no metadata found — starting blank');
+      return [];
+    }
+    window.appLog?.write(`Cache: loaded metadata for ${cached.length} photo(s)`);
 
+    let localHits = 0;
     const resolved = await Promise.all(
       cached
         .filter(p => p.active !== false)
@@ -128,12 +137,14 @@ async function loadCachedPhotos() {
         .map(async (photo) => {
           if (photo.filename) {
             const localUrl = await window.photoCache.getLocalPath(photo.filename);
-            if (localUrl) return { ...photo, url: localUrl };
+            if (localUrl) { localHits++; return { ...photo, url: localUrl }; }
+            window.appLog?.write(`Cache: missing local file for ${photo.filename} — will use remote`);
           }
           return photo;
         })
     );
 
+    window.appLog?.write(`Cache: ${localHits}/${cached.length} photos resolved from local disk`);
     photos = resolved;
     if (photos.length > 0) {
       if (currentIndex >= photos.length) currentIndex = 0;
@@ -142,7 +153,7 @@ async function loadCachedPhotos() {
     }
     return photos;
   } catch (err) {
-    console.error('Error loading cached photos:', err);
+    window.appLog?.write(`Cache: loadCachedPhotos error: ${err.message}`);
     return [];
   }
 }
@@ -207,12 +218,31 @@ function resetAutoPlay() {
   }
 }
 
+async function refreshEstimateCache() {
+  try {
+    const res = await fetch(`${serverUrl}/api/estimate-options`);
+    if (!res.ok) return;
+    const all = await res.json();
+    for (const [company, data] of Object.entries(all)) {
+      if (Array.isArray(data) && data.length > 0) {
+        localStorage.setItem(`cachedEstimateOptions_${company}`, JSON.stringify(data));
+      }
+    }
+    window.appLog?.write(`EstimateCache: refreshed ${Object.keys(all).length} company/companies`);
+  } catch (err) {
+    window.appLog?.write(`EstimateCache: refresh failed — ${err.message}`);
+  }
+}
+
 function startAutoRefresh() {
   // Check for photo changes every 10 seconds
   refreshTimer = setInterval(() => {
     loadRemoteSettings();
     loadPhotos();
   }, 10000);
+  // Refresh estimate options cache once an hour
+  refreshEstimateCache();
+  setInterval(refreshEstimateCache, 60 * 5 * 1000);
 }
 
 function stopAutoRefresh() {

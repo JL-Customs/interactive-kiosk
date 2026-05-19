@@ -6,7 +6,7 @@ const http = require('http');
 const { pathToFileURL } = require('url');
 const { autoUpdater } = require('electron-updater');
 
-const UPDATE_INTERVAL_MS = 1 * 60 * 1000; // 1 min for testing; change to 60 * 60 * 1000 for production
+const UPDATE_INTERVAL_MS = 1 * 60 * 1000; 
 
 let logPath;
 function log(msg) {
@@ -49,6 +49,8 @@ function createWindow() {
   mainWindow.loadFile('index.html');
   // mainWindow.webContents.openDevTools(); // Uncomment for development
 }
+
+ipcMain.handle('log:write', (event, msg) => log(msg));
 
 ipcMain.handle('window:toggle-fullscreen', () => {
   if (!mainWindow) return false;
