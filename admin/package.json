@@ -1,7 +1,7 @@
 {
-  "name": "jl-customs-admin-portal",
+  "name": "interactive-kiosk-admin",
   "version": "1.0.0",
-  "description": "Admin portal for managing photo gallery content",
+  "description": "Admin interface for JL Customs interactive kiosk",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

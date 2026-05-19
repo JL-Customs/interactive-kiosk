@@ -1,14 +1,46 @@
 {
-  "name": "jl-customs-photo-gallery",
+  "name": "interactive-kiosk-user",
   "version": "1.0.0",
-  "description": "Photo gallery display app that rotates through uploaded photos",
+  "description": "Interactive kiosk app for JL Customs",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "dotenv -- electron-builder --publish always"
   },
   "devDependencies": {
-    "electron": "^27.0.0"
+    "electron": "^27.0.0",
+    "electron-builder": "^24.0.0",
+    "dotenv-cli": "^7.0.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "electron-updater": "^6.0.0"
+  },
+  "build": {
+    "appId": "com.jlcustoms.user",
+    "productName": "JL-Customs-User",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!node_modules/electron-builder/**",
+      "!node_modules/.cache/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "JL-Customs",
+      "repo": "interactive-kiosk-user"
+    }
+  }
 }
