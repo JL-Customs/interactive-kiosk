@@ -367,6 +367,9 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
     port: Number(SMTP_PORT) || 587,
     secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
 
   const rows = items.map(i =>
@@ -413,7 +416,7 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    console.error('Email send error:', err);
+    console.error('Estimate email error:', err.message);
     res.status(500).json({ error: 'Failed to send email. Please try again.' });
   }
 });
@@ -438,6 +441,9 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
     port: Number(SMTP_PORT) || 587,
     secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
 
   const html = `
@@ -475,7 +481,7 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    console.error('Contact email send error:', err);
+    console.error('Contact email error:', err.message);
     res.status(500).json({ error: 'Failed to send email. Please try again.' });
   }
 });
