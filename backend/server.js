@@ -442,6 +442,8 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
     return res.status(503).json({ error: 'Email is not configured on the server.' });
   }
 
+  console.log(`Contact email: attempting send to ${email} via ${SMTP_HOST}:${SMTP_PORT || 587}`);
+
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
     port: Number(SMTP_PORT) || 587,
