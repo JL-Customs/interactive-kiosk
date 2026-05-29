@@ -90,6 +90,7 @@
     .contact-btn:hover { background: #f0f0f0; border-color: #c0392b; }
     .contact-btn:active { transform: scale(0.97); }
 
+
     /* ── Contact Modal ── */
     .modal-overlay {
       display: none;
@@ -280,9 +281,12 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" onclick="printContactInfo()">&#128438; Print</button>
-          <button class="btn-primary" onclick="showContactStep('email')">&#9993; Send to My Email</button>
+        <div class="modal-footer" style="flex-direction:column; gap:10px;">
+          <div style="display:flex; gap:10px; width:100%;">
+            <button class="btn-secondary" style="flex:1;" onclick="printContactInfo()">&#128438; Print</button>
+            <button class="btn-secondary" style="flex:1;" onclick="showContactStep('email')">&#9993; Email Me</button>
+          </div>
+          <button class="btn-primary" style="width:100%;" onclick="startVideoCall()">Video Call an Expert</button>
         </div>
       </div>
 
@@ -395,6 +399,13 @@
     document.getElementById('contact-overlay').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) closeContactModal();
     });
+
+    async function startVideoCall() {
+      try {
+        await fetch(`${serverUrl}/api/notify-boss`, { method: 'POST' });
+      } catch { /* proceed even if notification fails */ }
+      window.location.href = 'video-call.html';
+    }
   </script>
 
   <script>

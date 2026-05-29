@@ -492,6 +492,31 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
 });
 
 /**
+ * Notify boss via SMS when a customer starts a video call
+ */
+app.post('/api/notify-boss', express.json(), async (req, res) => {
+  const { TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM } = process.env;
+  const bossPhone = process.env.BOSS_PHONE || '+13176183980';
+
+  if (!TWILIO_SID || !TWILIO_TOKEN || !TWILIO_FROM) {
+    return res.status(503).json({ error: 'SMS not configured.' });
+  }
+
+  try {
+    const twilio = require('twilio')(TWILIO_SID, TWILIO_TOKEN);
+    await twilio.messages.create({
+      body: 'JL Customs Kiosk: A customer wants to video call. Join here: https://meet.jit.si/jlcustoms-expert-kiosk',
+      from: TWILIO_FROM,
+      to: bossPhone,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Notify boss error:', err.message);
+    res.status(500).json({ error: 'Failed to send notification.' });
+  }
+});
+
+/**
  * Error handling middleware
  */
 app.use((err, req, res, next) => {

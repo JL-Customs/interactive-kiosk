@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -112,6 +112,11 @@ app.on('ready', () => {
   log(`App started — version ${app.getVersion()}`);
   setupCache();
   Menu.setApplicationMenu(null);
+
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true);
+  });
+
   createWindow();
   autoUpdater.checkForUpdates().catch((e) => log(`checkForUpdates error: ${e.message}`));
   setInterval(() => autoUpdater.checkForUpdates().catch((e) => log(`checkForUpdates error: ${e.message}`)), UPDATE_INTERVAL_MS);
