@@ -492,22 +492,23 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
 });
 
 /**
- * Notify boss via SMS when a customer starts a video call
+ * Notify boss via push notification when a customer starts a video call
  */
-app.post('/api/notify-boss', express.json(), async (req, res) => {
-  const { TWILIO_SID, TWILIO_TOKEN, TWILIO_FROM } = process.env;
-  const bossPhone = process.env.BOSS_PHONE || '+13176183980';
-
-  if (!TWILIO_SID || !TWILIO_TOKEN || !TWILIO_FROM) {
-    return res.status(503).json({ error: 'SMS not configured.' });
+app.post('/api/notify-boss', async (req, res) => {
+  const topic = process.env.NTFY_TOPIC;
+  if (!topic) {
+    return res.status(503).json({ error: 'Notifications not configured.' });
   }
 
   try {
-    const twilio = require('twilio')(TWILIO_SID, TWILIO_TOKEN);
-    await twilio.messages.create({
-      body: 'JL Customs Kiosk: A customer wants to video call. Join here: https://meet.jit.si/jlcustoms-expert-kiosk',
-      from: TWILIO_FROM,
-      to: bossPhone,
+    await fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      headers: {
+        'Title': 'Customer Waiting',
+        'Priority': 'high',
+        'Tags': 'video_camera',
+      },
+      body: 'A customer at the kiosk wants to video call. Tap to join: https://meet.jit.si/jlcustoms-expert-kiosk',
     });
     res.json({ success: true });
   } catch (err) {

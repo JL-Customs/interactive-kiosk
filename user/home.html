@@ -402,8 +402,11 @@
 
     async function startVideoCall() {
       try {
-        await fetch(`${serverUrl}/api/notify-boss`, { method: 'POST' });
-      } catch { /* proceed even if notification fails */ }
+        const res = await fetch(`${serverUrl}/api/notify-boss`, { method: 'POST' });
+        window.appLog?.write(`notify-boss: ${res.status}`);
+      } catch (err) {
+        window.appLog?.write(`notify-boss error: ${err.message}`);
+      }
       window.location.href = 'video-call.html';
     }
   </script>
