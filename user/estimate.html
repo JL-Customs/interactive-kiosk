@@ -693,12 +693,18 @@
       }));
       const total = items.reduce((sum, i) => sum + i.price, 0);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
       try {
         const res = await fetch(`${serverUrl}/api/send-estimate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, items, total }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeout);
 
         if (res.ok) {
           document.getElementById('confirm-msg').textContent =
@@ -709,6 +715,7 @@
           errorEl.textContent = data.error || 'Failed to send. Please try again.';
         }
       } catch {
+        clearTimeout(timeout);
         errorEl.textContent = 'Could not reach the server. Please try again.';
       }
 
