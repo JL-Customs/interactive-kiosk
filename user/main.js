@@ -6,7 +6,7 @@ const http = require('http');
 const { pathToFileURL } = require('url');
 const { autoUpdater } = require('electron-updater');
 
-const UPDATE_INTERVAL_MS = 1 * 60 * 1000; 
+const UPDATE_INTERVAL_MS = 15 * 60 * 1000; 
 
 let logPath;
 function log(msg) {

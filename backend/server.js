@@ -419,6 +419,68 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
 });
 
 /**
+ * Send contact info via email
+ */
+app.post('/api/send-contact', express.json(), async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'email is required' });
+  }
+
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    return res.status(503).json({ error: 'Email is not configured on the server.' });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT) || 587,
+    secure: Number(SMTP_PORT) === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#222;">
+      <h2 style="background:#c0392b;color:#fff;padding:20px 24px;margin:0;border-radius:8px 8px 0 0;">
+        JL Customs - Contact an Expert
+      </h2>
+      <div style="border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;padding:24px;">
+        <p style="margin:0 0 20px;color:#444;">
+          Thanks for your interest! Here's how to reach us:
+        </p>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:12px;font-weight:bold;width:80px;">Phone</td>
+            <td style="padding:12px;">(555) 123-4567</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:12px;font-weight:bold;">Email</td>
+            <td style="padding:12px;">info@jlcustoms.com</td>
+          </tr>
+        </table>
+        <p style="margin-top:20px;color:#666;font-size:0.9rem;">
+          We look forward to hearing from you.
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: SMTP_FROM || SMTP_USER,
+      to: email,
+      subject: 'JL Customs - Contact Information',
+      html,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Contact email send error:', err);
+    res.status(500).json({ error: 'Failed to send email. Please try again.' });
+  }
+});
+
+/**
  * Error handling middleware
  */
 app.use((err, req, res, next) => {
