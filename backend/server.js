@@ -147,6 +147,15 @@ function loadEstimateOptions() {
   }
 }
 
+function sendMailWithTimeout(transporter, options, ms = 30000) {
+  return Promise.race([
+    transporter.sendMail(options),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Email timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 function saveEstimateOptions() {
   try {
     fs.writeFileSync(estimateOptionsFile, JSON.stringify(estimateOptions, null, 2));
@@ -367,9 +376,6 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
     port: Number(SMTP_PORT) || 587,
     secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
   });
 
   const rows = items.map(i =>
@@ -408,7 +414,7 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
   `;
 
   try {
-    await transporter.sendMail({
+    await sendMailWithTimeout(transporter, {
       from: SMTP_FROM || SMTP_USER,
       to: email,
       subject: 'Your JL Customs Estimate',
@@ -441,9 +447,6 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
     port: Number(SMTP_PORT) || 587,
     secure: Number(SMTP_PORT) === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
   });
 
   const html = `
@@ -473,7 +476,7 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
   `;
 
   try {
-    await transporter.sendMail({
+    await sendMailWithTimeout(transporter, {
       from: SMTP_FROM || SMTP_USER,
       to: email,
       subject: 'JL Customs - Contact Information',
