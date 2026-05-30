@@ -2,146 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JL Customs - Video Call</title>
+  <title>Connecting...</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-      font-family: sans-serif;
-    }
-
-    #meet {
-      width: 100%;
-      height: 100%;
-    }
-
-    #connecting {
-      position: fixed;
-      inset: 0;
-      background: #111;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      color: #fff;
-      z-index: 50;
-    }
-
-    #connecting h2 {
-      font-size: 1.8rem;
-      font-weight: bold;
-      letter-spacing: 0.04em;
-    }
-
-    #connecting p {
-      font-size: 1rem;
-      color: #aaa;
-    }
-
-    .spinner {
-      width: 52px;
-      height: 52px;
-      border: 4px solid #333;
-      border-top-color: #c0392b;
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    #end-btn {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 100;
-      padding: 10px 20px;
-      font-size: 0.9rem;
-      font-weight: bold;
-      background: rgba(0,0,0,0.6);
-      color: #fff;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s;
-      display: none;
-    }
-
-    #end-btn:hover { background: rgba(192,57,43,0.8); }
+    html, body { width: 100%; height: 100%; background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; font-family: sans-serif; color: #fff; }
+    .spinner { width: 48px; height: 48px; border: 4px solid #333; border-top-color: #c0392b; border-radius: 50%; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { color: #aaa; font-size: 1rem; }
   </style>
 </head>
 <body>
-
-  <div id="connecting">
-    <div class="spinner"></div>
-    <h2>Connecting...</h2>
-    <p>An expert has been notified and will join shortly.</p>
-  </div>
-
-  <button id="end-btn" onclick="endCall()">&#8592; End Call</button>
-  <div id="meet"></div>
-
-  <script src="https://meet.jit.si/external_api.js"></script>
+  <div class="spinner"></div>
+  <p>Starting video call...</p>
   <script>
-    let api;
-
-    function endCall() {
-      if (api) api.dispose();
-      window.location.href = 'home.html';
-    }
-
-    function initCall() {
-      api = new JitsiMeetExternalAPI('meet.jit.si', {
-        roomName: 'jlcustoms-expert-kiosk',
-        width: '100%',
-        height: '100%',
-        parentNode: document.getElementById('meet'),
-        userInfo: { displayName: 'Customer' },
-        configOverwrite: {
-          startWithAudioMuted: false,
-          startWithVideoMuted: false,
-          disableDeepLinking: true,
-          prejoinPageEnabled: false,
-        },
-        interfaceConfigOverwrite: {
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_WATERMARK_FOR_GUESTS: false,
-          TOOLBAR_ALWAYS_VISIBLE: true,
-        },
-      });
-
-      api.addEventListener('videoConferenceJoined', () => {
-        document.getElementById('connecting').style.display = 'none';
-        document.getElementById('end-btn').style.display = '';
-      });
-
-      api.addEventListener('readyToClose', endCall);
-      api.addEventListener('videoConferenceLeft', endCall);
-    }
-
-    if (typeof JitsiMeetExternalAPI !== 'undefined') {
-      initCall();
-    } else {
-      document.querySelector('#connecting p').textContent = 'Loading video call...';
-      const script = document.querySelector('script[src*="external_api"]');
-      script.addEventListener('load', initCall);
-      script.addEventListener('error', () => {
-        document.querySelector('#connecting h2').textContent = 'Connection Failed';
-        document.querySelector('#connecting p').textContent = 'Could not load video call. Please check your internet connection.';
-        setTimeout(() => { window.location.href = 'home.html'; }, 4000);
-      });
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') endCall();
-    });
+    window.location.replace('https://meet.jit.si/jlcustoms-expert-kiosk#config.prejoinPageEnabled=false&userInfo.displayName=Customer');
   </script>
 </body>
 </html>

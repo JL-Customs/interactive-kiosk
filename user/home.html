@@ -45,6 +45,10 @@
       gap: 20px;
     }
 
+    .estimate-btn, .contact-btn {
+      width: 620px;
+    }
+
     .tagline {
       font-size: 1.1rem;
       color: #888;
@@ -71,20 +75,17 @@
 
     /* ── Contact button (bottom-left) ── */
     .contact-btn {
-      position: fixed;
-      bottom: 28px;
-      left: 28px;
-      padding: 12px 22px;
-      font-size: 0.95rem;
+      padding: 44px 100px;
+      font-size: 2.6rem;
       font-weight: bold;
       color: #111;
       background: #fff;
       border: 2px solid #e0e0e0;
-      border-radius: 8px;
+      border-radius: 14px;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s, transform 0.1s;
       user-select: none;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.05em;
     }
 
     .contact-btn:hover { background: #f0f0f0; border-color: #c0392b; }
@@ -248,9 +249,8 @@
   <main>
     <!-- <p class="tagline">Custom Commercial Vehicles</p> -->
     <button class="estimate-btn" onclick="window.location.href='vehicle-select.html'">Get an Estimate</button>
+    <button class="contact-btn" onclick="openContactModal()">Contact an Expert</button>
   </main>
-
-  <button class="contact-btn" onclick="openContactModal()">Contact an Expert</button>
 
   <div id="contact-print-area"></div>
 
@@ -262,10 +262,9 @@
         <button class="modal-close" onclick="closeContactModal()">&times;</button>
       </div>
 
-      <!-- Step: info -->
       <div id="contact-step-info">
         <div class="modal-body">
-          <p class="contact-intro">Speak directly with one of our specialists - we're happy to help.</p>
+          <p class="contact-intro">Speak directly with one of our experts - we're happy to help.</p>
           <div class="contact-row">
             <span class="contact-icon">&#128222;</span>
             <div>

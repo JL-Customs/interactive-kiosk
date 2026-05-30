@@ -47,7 +47,18 @@ function createWindow() {
 
   mainWindow.removeMenu();
   mainWindow.loadFile('index.html');
-  // mainWindow.webContents.openDevTools(); // Uncomment for development
+
+  mainWindow.webContents.on('did-navigate', (event, url) => {
+    if (!url.startsWith('file://') && !url.includes('jlcustoms-expert-kiosk')) {
+      mainWindow.loadFile('home.html');
+    }
+  });
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape' && mainWindow.webContents.getURL().includes('meet.jit.si')) {
+      mainWindow.loadFile('home.html');
+    }
+  });
 }
 
 ipcMain.handle('log:write', (event, msg) => log(msg));
