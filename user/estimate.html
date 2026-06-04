@@ -111,6 +111,13 @@
       white-space: nowrap;
     }
 
+    .option-part-number {
+      display: block;
+      font-size: 0.8rem;
+      color: #999;
+      margin-top: 2px;
+    }
+
     .category-heading {
       font-size: 0.8rem;
       font-weight: bold;
@@ -504,8 +511,11 @@
       label.className = 'option';
       label.htmlFor = id;
       label.innerHTML = `
-        <input type="radio" name="${groupName}" id="${id}" data-price="${item.price}" data-label="${item.label}">
-        <span class="option-label">${item.label}</span>
+        <input type="radio" name="${groupName}" id="${id}" data-price="${item.price}" data-label="${item.label}" data-part-number="${item.partNumber || ''}">
+        <span class="option-label">
+          ${item.label}
+          ${item.partNumber ? `<span class="option-part-number">Part #: ${item.partNumber}</span>` : ''}
+        </span>
         <span class="option-price">${fmt(item.price)}</span>
       `;
       label.querySelector('input').addEventListener('change', () => {
@@ -531,8 +541,11 @@
       label.htmlFor = id;
       const nameAttr = groupName ? `name="${groupName}"` : '';
       label.innerHTML = `
-        <input type="${inputType}" ${nameAttr} id="${id}" data-price="${item.price}" data-label="${item.label}">
-        <span class="option-label">${item.label}</span>
+        <input type="${inputType}" ${nameAttr} id="${id}" data-price="${item.price}" data-label="${item.label}" data-part-number="${item.partNumber || ''}">
+        <span class="option-label">
+          ${item.label}
+          ${item.partNumber ? `<span class="option-part-number">Part #: ${item.partNumber}</span>` : ''}
+        </span>
         <span class="option-price">${fmt(item.price)}</span>
       `;
       label.addEventListener('change', updateTotal);
@@ -641,14 +654,16 @@
         document.getElementById('modal-body').innerHTML = '<p class="modal-empty">No items selected yet.</p>';
       } else {
         document.getElementById('modal-body').innerHTML = checked.map((cb) => {
-          const label = cb.dataset.label || cb.closest('.option')?.querySelector('.option-label')?.textContent || '';
-          return `<div class="summary-row"><span>${label}</span><span>${fmt(Number(cb.dataset.price))}</span></div>`;
+          const label = cb.dataset.label || '';
+          const partNumber = cb.dataset.partNumber;
+          const partTag = partNumber ? `<span style="font-size:0.8rem;color:#888;display:block;margin-top:2px;">Part #: ${partNumber}</span>` : '';
+          return `<div class="summary-row"><span>${label}${partTag}</span><span>${fmt(Number(cb.dataset.price))}</span></div>`;
         }).join('');
       }
 
       document.getElementById('modal-grand-total').textContent = `Total: ${fmt(total)}`;
-      document.getElementById('name-input').value = '';
-      document.getElementById('phone-input').value = '';
+      document.getElementById('name-input').value = sessionStorage.getItem('kiosk_name') || '';
+      document.getElementById('phone-input').value = sessionStorage.getItem('kiosk_phone') || '';
       document.getElementById('details-error').textContent = '';
       document.getElementById('email-input').value = '';
       document.getElementById('email-error').textContent = '';
@@ -672,6 +687,8 @@
       if (!name) { errorEl.textContent = 'Please enter your name.'; return; }
       if (!phone) { errorEl.textContent = 'Please enter your phone number.'; return; }
       errorEl.textContent = '';
+      sessionStorage.setItem('kiosk_name', name);
+      sessionStorage.setItem('kiosk_phone', phone);
       fetch(`${serverUrl}/api/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -692,8 +709,9 @@
       const checked = getChecked();
       const total = checked.reduce((sum, cb) => sum + Number(cb.dataset.price), 0);
       const rows = checked.map((cb) => {
-        const label = cb.dataset.label || cb.closest('.option')?.querySelector('.option-label')?.textContent || '';
-        return `<tr><td>${label}</td><td>$${Number(cb.dataset.price).toLocaleString('en-US')}</td></tr>`;
+        const label = cb.dataset.label || '';
+        const partNumber = cb.dataset.partNumber || '';
+        return `<tr><td>${label}</td><td>${partNumber}</td><td>$${Number(cb.dataset.price).toLocaleString('en-US')}</td></tr>`;
       }).join('');
 
       const name = document.getElementById('name-input').value.trim();
@@ -706,9 +724,9 @@
         <div class="print-date">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
         ${customerLine}
         <table>
-          <thead><tr><th>Item</th><th>Price</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="2">No items selected</td></tr>'}</tbody>
-          <tfoot><tr><td class="print-total">Estimated Total</td><td class="print-total">$${total.toLocaleString('en-US')}</td></tr></tfoot>
+          <thead><tr><th>Item</th><th>Part #</th><th>Price</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="3">No items selected</td></tr>'}</tbody>
+          <tfoot><tr><td class="print-total" colspan="2">Estimated Total</td><td class="print-total">$${total.toLocaleString('en-US')}</td></tr></tfoot>
         </table>
       `;
       closeModal();
@@ -733,8 +751,9 @@
 
       const checked = getChecked();
       const items = checked.map((cb) => ({
-        label: cb.dataset.label || cb.closest('.option')?.querySelector('.option-label')?.textContent || '',
+        label: cb.dataset.label || '',
         price: Number(cb.dataset.price),
+        partNumber: cb.dataset.partNumber || '',
       }));
       const total = items.reduce((sum, i) => sum + i.price, 0);
 
@@ -800,6 +819,8 @@
     function resetTimer() {
       clearTimeout(inactivityTimer);
       inactivityTimer = setTimeout(() => {
+        sessionStorage.removeItem('kiosk_name');
+        sessionStorage.removeItem('kiosk_phone');
         window.location.href = 'index.html';
       }, TIMEOUT_MS);
     }

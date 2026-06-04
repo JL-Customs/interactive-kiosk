@@ -142,6 +142,7 @@
               <th class="sortable" data-col="label">Item <span class="sort-arrow"></span></th>
               <th class="sortable" data-col="price">Price <span class="sort-arrow"></span></th>
               <th>Requires</th>
+              <th class="sortable" data-col="partNumber">Part # <span class="sort-arrow"></span></th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -169,7 +170,7 @@
           <div class="company-editor">
             <div class="csv-drop-zone" id="csv-upload-area">
               <p>Drop CSV files here or click to import</p>
-              <p style="font-size:0.8rem;color:#aaa;margin-top:4px;">Format: Category, Item, Price, Requires &dash; filename becomes the company name</p>
+              <p style="font-size:0.8rem;color:#aaa;margin-top:4px;">Format: Category, Item, Price, Requires, Part Number &dash; filename becomes the company name</p>
               <input type="file" id="csv-file-input" accept=".csv,text/csv" multiple style="display:none;">
             </div>
             <table class="photo-table" id="options-table" style="margin-top:1rem;">
@@ -178,6 +179,7 @@
                   <th>Item</th>
                   <th>Price ($)</th>
                   <th>Requires (pipe-separated)</th>
+                  <th>Part #</th>
                   <th>Actions</th>
                 </tr>
               </thead>

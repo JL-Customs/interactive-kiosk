@@ -696,6 +696,7 @@ function setupCsvTab() {
 
 // Parse CSV text into [{ category, items }]
 // Supports:
+//   5 col: "Category, Item, Price, Requires, Part Number"
 //   4 col: "Category, Item, Price, Requires"  (Requires = pipe-separated item labels)
 //   3 col: "Category, Item, Price"
 //   2 col: "Item, Price"  (legacy → "General" category)
@@ -710,14 +711,15 @@ function parseCsvText(text) {
       const category = parts[0].trim().replace(/^"|"$/g, '');
       if (category.toLowerCase() === 'category') continue; // skip header
 
-      let label, price, requires = [];
+      let label, price, requires = [], partNumber = '';
 
       if (parts.length >= 4) {
-        // 4-col: Category, Item, Price, Requires
+        // 4+ col: Category, Item, Price, Requires[, Part Number]
         label = parts[1].trim().replace(/^"|"$/g, '');
         price = parseFloat(parts[2].replace(/[^0-9.]/g, ''));
         const req = parts[3].trim().replace(/^"|"$/g, '');
         requires = req ? req.split('|').map(r => r.trim()).filter(Boolean) : [];
+        if (parts.length >= 5) partNumber = parts[4].trim().replace(/^"|"$/g, '');
       } else {
         // 3-col: Category, Item, Price
         label = parts[1].trim().replace(/^"|"$/g, '');
@@ -726,13 +728,13 @@ function parseCsvText(text) {
 
       if (!category || !label || isNaN(price)) continue;
       if (!map.has(category)) map.set(category, []);
-      map.get(category).push({ label, price, requires });
+      map.get(category).push({ label, price, requires, partNumber });
     } else if (parts.length === 2) {
       const label = parts[0].trim().replace(/^"|"$/g, '');
       const price = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
       if (!label || isNaN(price)) continue;
       if (!map.has('General')) map.set('General', []);
-      map.get('General').push({ label, price, requires: [] });
+      map.get('General').push({ label, price, requires: [], partNumber: '' });
     }
   }
 
@@ -812,6 +814,10 @@ function syncOptionsFromInputs() {
       estimateOptions[c].items[i].requires = val ? val.split('|').map(r => r.trim()).filter(Boolean) : [];
     }
   });
+  document.querySelectorAll('.opt-partnum-input').forEach(input => {
+    const c = Number(input.dataset.cat), i = Number(input.dataset.item);
+    if (estimateOptions[c]?.items[i]) estimateOptions[c].items[i].partNumber = input.value.trim();
+  });
   document.querySelectorAll('.opt-type-select').forEach(input => {
     const c = Number(input.dataset.cat);
     if (estimateOptions[c]) estimateOptions[c].type = input.value;
@@ -839,6 +845,7 @@ function renderOptionsTable() {
             <option value="single"${catType === 'single' ? ' selected' : ''}>Single</option>
           </select>
         </td>
+        <td></td>
         <td>
           <button class="btn-delete-single" onclick="removeCategory(${catIdx})">Remove Category</button>
         </td>
@@ -851,13 +858,14 @@ function renderOptionsTable() {
           <td><input type="text" class="opt-label-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${escHtml(item.label)}" placeholder="Item name"></td>
           <td><input type="number" class="opt-price-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${item.price}" min="0" step="1"></td>
           <td><input type="text" class="opt-requires-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${escHtml(requiresVal)}" placeholder="Item 1|Item 2"></td>
+          <td><input type="text" class="opt-partnum-input" data-cat="${catIdx}" data-item="${itemIdx}" value="${escHtml(item.partNumber || '')}" placeholder="Part #"></td>
           <td><button class="btn-delete-single" onclick="removeItem(${catIdx},${itemIdx})">Remove</button></td>
         </tr>
       `;
     });
     html += `
       <tr class="category-add-row">
-        <td colspan="4">
+        <td colspan="5">
           <button class="btn btn-primary add-item-btn" onclick="addItem(${catIdx})">+ Add Item</button>
         </td>
       </tr>
@@ -884,7 +892,7 @@ function addCategory() {
 function addItem(catIdx) {
   syncOptionsFromInputs();
   if (estimateOptions[catIdx]) {
-    estimateOptions[catIdx].items.push({ label: '', price: 0 });
+    estimateOptions[catIdx].items.push({ label: '', price: 0, requires: [], partNumber: '' });
     renderOptionsTable();
   }
 }
@@ -1045,10 +1053,11 @@ function exportOptionsCsv() {
       const cat_ = String(cat.category).replace(/"/g, '""');
       const label = String(item.label).replace(/"/g, '""');
       const req = Array.isArray(item.requires) ? item.requires.join('|') : (item.requires || '');
-      rows.push(`"${cat_}","${label}",${item.price},${req}`);
+      const partNum = String(item.partNumber || '').replace(/"/g, '""');
+      rows.push(`"${cat_}","${label}",${item.price},${req},"${partNum}"`);
     });
   });
-  const csv = 'Category,Item,Price,Requires\n' + rows.join('\n');
+  const csv = 'Category,Item,Price,Requires,Part Number\n' + rows.join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1096,6 +1105,7 @@ function renderPartsLibrary() {
           label: item.label || '',
           price: item.price ?? 0,
           requires: Array.isArray(item.requires) ? item.requires : [],
+          partNumber: item.partNumber || '',
         });
       }
     }
@@ -1112,7 +1122,7 @@ function renderPartsLibrary() {
   // Filter by company and search
   let rows = allRows.filter(row => {
     if (companyFilter && row.company !== companyFilter) return false;
-    if (search && !`${row.company} ${row.category} ${row.label}`.toLowerCase().includes(search)) return false;
+    if (search && !`${row.company} ${row.category} ${row.label} ${row.partNumber}`.toLowerCase().includes(search)) return false;
     return true;
   });
 
@@ -1150,7 +1160,7 @@ function renderPartsLibrary() {
   if (!tbody) return;
 
   if (partsGrouped.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:#999;">${
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:#999;">${
       allRows.length === 0 ? 'No parts loaded. Upload CSVs in Estimate Options.' : 'No items match your search.'
     }</td></tr>`;
     updatePartsSortArrows();
@@ -1172,6 +1182,7 @@ function renderPartsLibrary() {
       <td>${escHtml(group.label)}</td>
       <td class="parts-price-cell">$${partsFormatPrice(first.price)}</td>
       <td class="parts-req-cell">${partsReqTags(first.requires)}</td>
+      <td class="parts-partnum-cell">${escHtml(first.partNumber || '')}</td>
       <td><button class="btn-delete-single parts-edit-btn" onclick="editPartsRow(${idx})">Edit</button></td>
     </tr>`;
   }).join('');
@@ -1184,6 +1195,7 @@ function renderPartsLibrary() {
       tr.querySelector('.parts-cat-cell').textContent = entry.category;
       tr.querySelector('.parts-price-cell').textContent = '$' + partsFormatPrice(entry.price);
       tr.querySelector('.parts-req-cell').innerHTML = partsReqTags(entry.requires);
+      tr.querySelector('.parts-partnum-cell').textContent = entry.partNumber || '';
     });
   });
 
@@ -1226,6 +1238,7 @@ function editPartsRow(groupIdx) {
     <td><input class="parts-edit-input" id="edit-label-${groupIdx}" value="${escHtml(entry.label)}"></td>
     <td><input class="parts-edit-input parts-edit-price" id="edit-price-${groupIdx}" type="number" value="${entry.price}" min="0" step="1"></td>
     <td><input class="parts-edit-input" id="edit-req-${groupIdx}" value="${escHtml(entry.requires.join('|'))}" placeholder="Item 1|Item 2"></td>
+    <td><input class="parts-edit-input" id="edit-partnum-${groupIdx}" value="${escHtml(entry.partNumber || '')}" placeholder="Part #"></td>
     <td>
       <div class="parts-row-actions">
         <button class="btn btn-primary parts-save-btn" onclick="savePartsEdit(${groupIdx})">Save</button>
@@ -1250,6 +1263,7 @@ async function savePartsEdit(groupIdx) {
   const newPrice = Number(document.getElementById(`edit-price-${groupIdx}`).value);
   const reqRaw = document.getElementById(`edit-req-${groupIdx}`).value.trim();
   const newRequires = reqRaw ? reqRaw.split('|').map(r => r.trim()).filter(Boolean) : [];
+  const newPartNumber = document.getElementById(`edit-partnum-${groupIdx}`).value.trim();
 
   if (!newLabel || !newCategory) {
     alert('Item name and category cannot be empty.');
@@ -1266,7 +1280,7 @@ async function savePartsEdit(groupIdx) {
   if (oldItemIdx === -1) { renderPartsLibrary(); return; }
 
   if (newCategory === origCategory) {
-    cats[oldCatIdx].items[oldItemIdx] = { label: newLabel, price: newPrice, requires: newRequires };
+    cats[oldCatIdx].items[oldItemIdx] = { label: newLabel, price: newPrice, requires: newRequires, partNumber: newPartNumber };
   } else {
     cats[oldCatIdx].items.splice(oldItemIdx, 1);
     if (cats[oldCatIdx].items.length === 0) cats.splice(oldCatIdx, 1);
@@ -1275,7 +1289,7 @@ async function savePartsEdit(groupIdx) {
       targetCat = { category: newCategory, items: [] };
       cats.push(targetCat);
     }
-    targetCat.items.push({ label: newLabel, price: newPrice, requires: newRequires });
+    targetCat.items.push({ label: newLabel, price: newPrice, requires: newRequires, partNumber: newPartNumber });
   }
 
   await saveAllToLocalStore();

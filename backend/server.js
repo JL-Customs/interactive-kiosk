@@ -455,6 +455,7 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
   const rows = items.map(i =>
     `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #ddd;">${i.label}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #ddd;color:#666;">${i.partNumber || ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #ddd;text-align:right;">$${Number(i.price).toLocaleString('en-US')}</td>
     </tr>`
   ).join('');
@@ -469,6 +470,7 @@ app.post('/api/send-estimate', express.json(), async (req, res) => {
           <thead>
             <tr style="background:#f5f5f5;">
               <th style="padding:8px 12px;text-align:left;">Item</th>
+              <th style="padding:8px 12px;text-align:left;">Part #</th>
               <th style="padding:8px 12px;text-align:right;">Price</th>
             </tr>
           </thead>
