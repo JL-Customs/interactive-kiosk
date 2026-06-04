@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   localStorage.setItem('serverUrl', DEFAULT_SERVER_URL);
   serverUrl = DEFAULT_SERVER_URL;
   setupNavigation();
+  setupLeads();
   setupUploadArea();
   setupSettings();
   setupCsvTab();
@@ -54,6 +55,7 @@ function setupNavigation() {
         section.classList.add('active');
       }
       if (sectionId === 'parts') renderPartsLibrary();
+      if (sectionId === 'leads') loadLeadsFromServer();
     });
   });
 }
@@ -1286,4 +1288,84 @@ async function savePartsEdit(groupIdx) {
 
   renderPartsLibrary();
   setOptionsStatus(`Saved "${newLabel}" in ${origCompany}.`);
+}
+
+// ── Leads ──────────────────────────────────────────────────────────────────
+
+function setupLeads() {
+  document.getElementById('refresh-leads-btn').addEventListener('click', loadLeadsFromServer);
+  document.getElementById('clear-leads-btn').addEventListener('click', async () => {
+    if (!confirm('Delete all leads? This cannot be undone.')) return;
+    try {
+      const all = await fetch(`${serverUrl}/api/leads`).then(r => r.json());
+      await Promise.all(all.map(l =>
+        fetch(`${serverUrl}/api/leads/${l.id}`, { method: 'DELETE' })
+      ));
+      displayLeads([]);
+    } catch {
+      alert('Failed to clear leads. Check server connection.');
+    }
+  });
+}
+
+async function loadLeadsFromServer() {
+  const tbody = document.getElementById('leads-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#999;">Loading…</td></tr>';
+  try {
+    const res = await fetch(`${serverUrl}/api/leads`);
+    if (!res.ok) throw new Error('Bad response');
+    const data = await res.json();
+    displayLeads(data);
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#c0392b;">Could not load leads — check server connection.</td></tr>';
+  }
+}
+
+function displayLeads(leadsData) {
+  const tbody = document.getElementById('leads-tbody');
+
+  if (!leadsData.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#999;">No leads yet.</td></tr>';
+    return;
+  }
+
+  const sorted = [...leadsData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  tbody.innerHTML = sorted.map(lead => {
+    const date = new Date(lead.createdAt).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    });
+    const source = lead.source === 'estimate' ? 'Estimate' : 'Contact';
+    const total = lead.total != null ? `$${Number(lead.total).toLocaleString('en-US')}` : '—';
+    return `
+      <tr>
+        <td>${date}</td>
+        <td>${escapeHtml(lead.name)}</td>
+        <td>${escapeHtml(lead.phone)}</td>
+        <td>${lead.email ? escapeHtml(lead.email) : '—'}</td>
+        <td>${source}</td>
+        <td>${total}</td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="deleteLead('${lead.id}')">Delete</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+async function deleteLead(id) {
+  try {
+    await fetch(`${serverUrl}/api/leads/${id}`, { method: 'DELETE' });
+    loadLeadsFromServer();
+  } catch {
+    alert('Failed to delete lead.');
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

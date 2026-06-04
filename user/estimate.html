@@ -360,6 +360,7 @@
     #print-area td { padding: 8px 12px; border-bottom: 1px solid #ccc; }
     #print-area td:last-child, #print-area th:last-child { text-align: right; }
     #print-area .print-total { font-weight: bold; font-size: 1.1rem; }
+    #print-area .print-sub { color: #555; font-size: 1rem; margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -389,6 +390,19 @@
       <div class="modal-header">
         <h2 id="modal-title">Your Estimate</h2>
         <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+
+      <div id="step-details">
+        <div class="modal-body">
+          <p class="email-prompt">Please enter your name and phone number to continue.</p>
+          <input type="text" id="name-input" class="email-input" placeholder="Your Name" autocomplete="off" style="margin-bottom: 12px;">
+          <input type="tel" id="phone-input" class="email-input" placeholder="Phone Number" autocomplete="off">
+          <p class="email-error" id="details-error"></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-back" id="btn-cancel-details">Cancel</button>
+          <button class="btn-primary" id="btn-continue-details">Continue</button>
+        </div>
       </div>
 
       <div id="step-review">
@@ -428,6 +442,7 @@
 
   <script>
     const serverUrl = 'https://interactive-monitor-thing.onrender.com';
+    let currentEstimateLeadId = null;
     const company = new URLSearchParams(window.location.search).get('company') || 'Company_1';
 
     const fmt = (n) => '$' + n.toLocaleString('en-US');
@@ -610,10 +625,11 @@
 
     // ── Modal steps ────────────────────────────────────────────
     function showStep(step) {
-      document.getElementById('step-review').style.display = step === 'review' ? '' : 'none';
-      document.getElementById('step-email').style.display  = step === 'email'  ? '' : 'none';
+      document.getElementById('step-details').style.display = step === 'details' ? '' : 'none';
+      document.getElementById('step-review').style.display  = step === 'review'  ? '' : 'none';
+      document.getElementById('step-email').style.display   = step === 'email'   ? '' : 'none';
       document.getElementById('step-confirm').style.display = step === 'confirm' ? '' : 'none';
-      const titles = { review: 'Your Estimate', email: 'Send Your Estimate', confirm: 'Estimate Sent' };
+      const titles = { details: 'Your Estimate', review: 'Your Estimate', email: 'Send Your Estimate', confirm: 'Estimate Sent' };
       document.getElementById('modal-title').textContent = titles[step];
     }
 
@@ -631,18 +647,41 @@
       }
 
       document.getElementById('modal-grand-total').textContent = `Total: ${fmt(total)}`;
+      document.getElementById('name-input').value = '';
+      document.getElementById('phone-input').value = '';
+      document.getElementById('details-error').textContent = '';
       document.getElementById('email-input').value = '';
       document.getElementById('email-error').textContent = '';
-      showStep('review');
+      showStep('details');
       document.getElementById('modal-overlay').classList.add('open');
     }
 
     function closeModal() {
       document.getElementById('modal-overlay').classList.remove('open');
+      currentEstimateLeadId = null;
     }
 
     document.getElementById('checkout-btn').addEventListener('click', openModal);
     document.getElementById('modal-close').addEventListener('click', closeModal);
+
+    document.getElementById('btn-cancel-details').addEventListener('click', closeModal);
+    document.getElementById('btn-continue-details').addEventListener('click', () => {
+      const name = document.getElementById('name-input').value.trim();
+      const phone = document.getElementById('phone-input').value.trim();
+      const errorEl = document.getElementById('details-error');
+      if (!name) { errorEl.textContent = 'Please enter your name.'; return; }
+      if (!phone) { errorEl.textContent = 'Please enter your phone number.'; return; }
+      errorEl.textContent = '';
+      fetch(`${serverUrl}/api/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, source: 'estimate' }),
+      })
+        .then(r => r.json())
+        .then(data => { if (data.lead) currentEstimateLeadId = data.lead.id; })
+        .catch(() => {});
+      showStep('review');
+    });
     document.getElementById('modal-overlay').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) closeModal();
     });
@@ -657,9 +696,15 @@
         return `<tr><td>${label}</td><td>$${Number(cb.dataset.price).toLocaleString('en-US')}</td></tr>`;
       }).join('');
 
+      const name = document.getElementById('name-input').value.trim();
+      const phone = document.getElementById('phone-input').value.trim();
+      const customerLine = (name || phone)
+        ? `<div class="print-sub">${[name, phone].filter(Boolean).join(' • ')}</div>`
+        : '';
       document.getElementById('print-area').innerHTML = `
         <h1>JL Customs — Estimate</h1>
         <div class="print-date">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        ${customerLine}
         <table>
           <thead><tr><th>Item</th><th>Price</th></tr></thead>
           <tbody>${rows || '<tr><td colspan="2">No items selected</td></tr>'}</tbody>
@@ -700,13 +745,26 @@
         const res = await fetch(`${serverUrl}/api/send-estimate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, items, total }),
+          body: JSON.stringify({
+            email,
+            items,
+            total,
+            name: document.getElementById('name-input').value.trim(),
+            phone: document.getElementById('phone-input').value.trim(),
+          }),
           signal: controller.signal,
         });
 
         clearTimeout(timeout);
 
         if (res.ok) {
+          if (currentEstimateLeadId) {
+            fetch(`${serverUrl}/api/leads/${currentEstimateLeadId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, items, total }),
+            }).catch(() => {});
+          }
           document.getElementById('confirm-msg').textContent =
             `Your estimate has been sent to ${email}. Thank you!`;
           showStep('confirm');

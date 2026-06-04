@@ -353,6 +353,11 @@ section h2 {
   opacity: 0.5;
 }
 
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
 .settings-form {
   background: white;
   padding: 1.5rem;

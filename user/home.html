@@ -262,6 +262,20 @@
         <button class="modal-close" onclick="closeContactModal()">&times;</button>
       </div>
 
+      <!-- Step: details -->
+      <div id="contact-step-details">
+        <div class="modal-body">
+          <p class="email-prompt">Please enter your name and phone number to continue.</p>
+          <input type="text" id="contact-name-input" class="email-input" placeholder="Your Name" autocomplete="off" style="margin-bottom: 12px;">
+          <input type="tel" id="contact-phone-input" class="email-input" placeholder="Phone Number" autocomplete="off">
+          <p class="email-error" id="contact-details-error"></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-back" onclick="closeContactModal()">Cancel</button>
+          <button class="btn-primary" onclick="submitContactDetails()">Continue</button>
+        </div>
+      </div>
+
       <div id="contact-step-info">
         <div class="modal-body">
           <p class="contact-intro">Speak directly with one of our experts - we're happy to help.</p>
@@ -318,32 +332,62 @@
 
   <script>
     const serverUrl = 'https://interactive-monitor-thing.onrender.com';
+    let currentContactLeadId = null;
 
     function openContactModal() {
       resetTimer();
+      document.getElementById('contact-name-input').value = '';
+      document.getElementById('contact-phone-input').value = '';
+      document.getElementById('contact-details-error').textContent = '';
       document.getElementById('contact-email-input').value = '';
       document.getElementById('contact-email-error').textContent = '';
-      showContactStep('info');
+      showContactStep('details');
       document.getElementById('contact-overlay').classList.add('open');
     }
 
     function closeContactModal() {
       document.getElementById('contact-overlay').classList.remove('open');
+      currentContactLeadId = null;
       resetTimer();
     }
 
     function showContactStep(step) {
+      document.getElementById('contact-step-details').style.display = step === 'details' ? '' : 'none';
       document.getElementById('contact-step-info').style.display    = step === 'info'    ? '' : 'none';
       document.getElementById('contact-step-email').style.display   = step === 'email'   ? '' : 'none';
       document.getElementById('contact-step-confirm').style.display = step === 'confirm' ? '' : 'none';
-      const titles = { info: 'Contact an Expert', email: 'Send Contact Info', confirm: 'Info Sent' };
+      const titles = { details: 'Contact an Expert', info: 'Contact an Expert', email: 'Send Contact Info', confirm: 'Info Sent' };
       document.getElementById('contact-modal-title').textContent = titles[step];
     }
 
+    function submitContactDetails() {
+      const name = document.getElementById('contact-name-input').value.trim();
+      const phone = document.getElementById('contact-phone-input').value.trim();
+      const errorEl = document.getElementById('contact-details-error');
+      if (!name) { errorEl.textContent = 'Please enter your name.'; return; }
+      if (!phone) { errorEl.textContent = 'Please enter your phone number.'; return; }
+      errorEl.textContent = '';
+      fetch(`${serverUrl}/api/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, source: 'contact' }),
+      })
+        .then(r => r.json())
+        .then(data => { if (data.lead) currentContactLeadId = data.lead.id; })
+        .catch(() => {});
+      showContactStep('info');
+    }
+
     function printContactInfo() {
+      const name = document.getElementById('contact-name-input').value.trim();
+      const phone = document.getElementById('contact-phone-input').value.trim();
+      const customerLine = (name || phone)
+        ? `<div class="print-row">Customer: <span>${[name, phone].filter(Boolean).join(' • ')}</span></div>`
+        : '';
       document.getElementById('contact-print-area').innerHTML = `
         <h1>JL Customs</h1>
         <div class="print-sub">Contact an Expert</div>
+        ${customerLine}
         <div class="print-row">Phone: <span>(555) 123-4567</span></div>
         <div class="print-row">Email: <span>info@jlcustoms.com</span></div>
       `;
@@ -372,13 +416,24 @@
         const res = await fetch(`${serverUrl}/api/send-contact`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({
+            email,
+            name: document.getElementById('contact-name-input').value.trim(),
+            phone: document.getElementById('contact-phone-input').value.trim(),
+          }),
           signal: controller.signal,
         });
 
         clearTimeout(timeout);
 
         if (res.ok) {
+          if (currentContactLeadId) {
+            fetch(`${serverUrl}/api/leads/${currentContactLeadId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email }),
+            }).catch(() => {});
+          }
           document.getElementById('contact-confirm-msg').textContent =
             `Our contact information has been sent to ${email}.`;
           showContactStep('confirm');

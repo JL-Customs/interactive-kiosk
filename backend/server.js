@@ -51,11 +51,13 @@ app.use(express.static('uploads'));
 const photosDataFile = path.join(__dirname, 'photos-data.json');
 const settingsDataFile = path.join(__dirname, 'settings-data.json');
 const estimateOptionsFile = path.join(__dirname, 'estimate-options.json');
+const leadsDataFile = path.join(__dirname, 'leads-data.json');
 let photos = [];
 let settings = {
   rotationInterval: 5
 };
 let estimateOptions = {}; // keyed by company name
+let leads = [];
 
 function getBaseUrl(req) {
   const configuredBaseUrl = process.env.PUBLIC_BASE_URL;
@@ -164,10 +166,30 @@ function saveEstimateOptions() {
   }
 }
 
+function loadLeads() {
+  if (fs.existsSync(leadsDataFile)) {
+    try {
+      leads = JSON.parse(fs.readFileSync(leadsDataFile, 'utf8'));
+    } catch (e) {
+      console.error('Error loading leads:', e);
+      leads = [];
+    }
+  }
+}
+
+function saveLeads() {
+  try {
+    fs.writeFileSync(leadsDataFile, JSON.stringify(leads, null, 2));
+  } catch (e) {
+    console.error('Error saving leads:', e);
+  }
+}
+
 // Initialize photos
 loadPhotos();
 loadSettings();
 loadEstimateOptions();
+loadLeads();
 
 // Routes
 
@@ -353,6 +375,58 @@ app.post('/api/estimate-options/:company', express.json(), (req, res) => {
   }
   estimateOptions[company] = options;
   saveEstimateOptions();
+  res.json({ success: true });
+});
+
+/**
+ * Get all leads
+ */
+app.get('/api/leads', (req, res) => {
+  res.json(leads);
+});
+
+/**
+ * Create a new lead
+ */
+app.post('/api/leads', express.json(), (req, res) => {
+  const { name, phone, source } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ error: 'name and phone are required' });
+  }
+  const lead = {
+    id: Date.now().toString(),
+    name,
+    phone,
+    source: source || 'unknown',
+    createdAt: new Date().toISOString(),
+  };
+  leads.push(lead);
+  saveLeads();
+  res.json({ success: true, lead });
+});
+
+/**
+ * Update a lead (attach email/items/total after action taken)
+ */
+app.patch('/api/leads/:id', express.json(), (req, res) => {
+  const lead = leads.find(l => l.id === req.params.id);
+  if (!lead) return res.status(404).json({ error: 'Lead not found' });
+  const { email, items, total } = req.body;
+  if (email !== undefined) lead.email = email;
+  if (items !== undefined) lead.items = items;
+  if (total !== undefined) lead.total = total;
+  saveLeads();
+  res.json({ success: true, lead });
+});
+
+/**
+ * Delete a lead
+ */
+app.delete('/api/leads/:id', (req, res) => {
+  const index = leads.findIndex(l => l.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: 'Lead not found' });
+  leads.splice(index, 1);
+  saveLeads();
   res.json({ success: true });
 });
 

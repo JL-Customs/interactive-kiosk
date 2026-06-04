@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JL Customs - Photo Gallery</title>
+  <link rel="stylesheet" href="gallery.css">
+</head>
+<body>
+  <header>
+    <button id="back-btn" onclick="window.location.href='index.html'">&#8592; Back to Slideshow</button>
+    <h1>Photo Gallery</h1>
+  </header>
+
+  <div id="photo-grid"></div>
+
+  <div id="lightbox" class="hidden">
+    <button id="lightbox-close">&#10005;</button>
+    <button id="lightbox-prev">&#8249;</button>
+    <img id="lightbox-img" src="" alt="Full size photo" />
+    <button id="lightbox-next">&#8250;</button>
+    <div id="lightbox-counter"></div>
+  </div>
+
+  <script src="gallery.js"></script>
+</body>
+</html>
