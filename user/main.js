@@ -54,11 +54,6 @@ function createWindow() {
     }
   });
 
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown' && input.key === 'Escape' && mainWindow.webContents.getURL().includes('meet.jit.si')) {
-      mainWindow.loadFile('home.html');
-    }
-  });
 }
 
 ipcMain.handle('log:write', (event, msg) => log(msg));

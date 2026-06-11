@@ -486,10 +486,6 @@
       document.addEventListener(ev, resetTimer, { passive: true });
     });
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' || e.key === 'Backspace') goBack();
-    });
-
     resetTimer();
   </script>
 </body>
