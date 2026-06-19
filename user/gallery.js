@@ -1,4 +1,4 @@
-const DEFAULT_SERVER_URL = 'https://interactive-monitor-thing.onrender.com';
+const DEFAULT_SERVER_URL = window.JLConfig.serverUrl;
 let photos = [];
 let lightboxIndex = 0;
 
@@ -61,7 +61,7 @@ function renderGrid() {
   if (photos.length === 0) {
     const msg = document.createElement('p');
     msg.className = 'no-photos';
-    msg.textContent = 'No photos available.';
+    msg.textContent = 'No photos to show yet — check back soon.';
     grid.appendChild(msg);
     return;
   }

@@ -1,0 +1,120 @@
+/* ============================================================
+   JL Customs — shared design system
+   One language for every kiosk screen: graphite + brand red on
+   warm paper, set in the Archivo superfamily (self-hosted so it
+   works offline). Layouts live in each page; this file owns the
+   tokens, typography, and shared component polish.
+   ============================================================ */
+
+/* ── Typeface ─────────────────────────────────────────────────
+   Archivo variable: weight 100–900 and width 62–125% in one file.
+   Expanded width is used for display type via font-stretch. */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url('fonts/archivo-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url('fonts/archivo-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Surfaces — warm "paint booth" neutrals, not dead gray */
+  --paper:        #f3f1ec;
+  --surface:      #ffffff;
+  --surface-2:    #faf8f4;
+
+  /* Ink & text */
+  --ink:          #17191e;
+  --steel:        #565d67;
+  --steel-soft:   #8a909a;
+
+  /* Lines */
+  --line:         #e7e3db;
+  --line-strong:  #d8d3c9;
+
+  /* Graphite — dark structural surfaces & showcase pages */
+  --graphite:     #16181c;
+  --graphite-2:   #20242a;
+  --graphite-3:   #2c313a;
+
+  /* Brand red — pulled from the logo signature */
+  --brand:        #d12d2b;
+  --brand-strong: #ad211f;
+  --brand-deep:   #8c1a18;
+  --brand-tint:   rgba(209, 45, 43, 0.08);
+  --brand-ring:   rgba(209, 45, 43, 0.34);
+
+  /* Status */
+  --ok:           #1f9d57;
+  --danger:       #d12d2b;
+
+  /* Typography */
+  --font-ui:      'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --tnum:         'tnum' 1, 'lnum' 1;
+
+  /* Radii */
+  --r-sm: 8px;
+  --r:    12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* Elevation */
+  --shadow-sm:   0 1px 2px rgba(18, 20, 26, 0.05), 0 1px 3px rgba(18, 20, 26, 0.05);
+  --shadow:      0 6px 16px -8px rgba(18, 20, 26, 0.18), 0 2px 6px -2px rgba(18, 20, 26, 0.08);
+  --shadow-md:   0 14px 32px -12px rgba(18, 20, 26, 0.22), 0 4px 10px -4px rgba(18, 20, 26, 0.10);
+  --shadow-lg:   0 28px 64px -20px rgba(12, 14, 18, 0.40);
+  --shadow-brand: 0 10px 24px -8px rgba(174, 33, 31, 0.45);
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Display type helper: confident, slightly expanded, tight tracking */
+.u-display {
+  font-family: var(--font-display);
+  font-stretch: 115%;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Eyebrow / utility label: stamped, uppercase, with a brand tick */
+.u-eyebrow {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--steel-soft);
+}
+
+/* Tabular figures for any money / counts */
+.u-nums { font-variant-numeric: tabular-nums lining-nums; font-feature-settings: var(--tnum); }
+
+/* Shared niceties */
+::selection { background: var(--brand); color: #fff; }
+
+:focus-visible {
+  outline: 3px solid var(--brand-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
