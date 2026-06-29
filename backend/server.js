@@ -207,31 +207,6 @@ app.get('/api/health', (req, res) => {
 });
 
 /**
- * TEMP diagnostic — remove after debugging ntfy auth. Reports a non-secret
- * fingerprint of NTFY_TOKEN and the live result of publishing with it.
- */
-app.get('/api/notify-debug', async (req, res) => {
-  const token = (process.env.NTFY_TOKEN || '').trim();
-  const topic = (process.env.NTFY_TOPIC || '').trim().replace(/^["']|["']$/g, '');
-  const fp = {
-    tokenLen: token.length,
-    tokenStartsWithTk: token.startsWith('tk_'),
-    tokenPrefix: token.slice(0, 6),
-    tokenSuffix: token.slice(-4),
-    topic,
-  };
-  try {
-    const headers = { 'Title': 'diag', 'Tags': 'wrench' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const r = await fetch(`https://ntfy.sh/${topic}`, { method: 'POST', headers, body: 'notify-debug diag' });
-    const body = await r.text().catch(() => '');
-    res.json({ ...fp, sentAuthHeader: Boolean(headers['Authorization']), ntfyStatus: r.status, ntfyBody: body.slice(0, 300) });
-  } catch (err) {
-    res.status(500).json({ ...fp, error: err.message });
-  }
-});
-
-/**
  * Get all photos
  */
 app.get('/api/photos', (req, res) => {
