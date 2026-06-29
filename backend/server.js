@@ -571,13 +571,15 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
  * Notify boss via push notification when a customer starts a video call
  */
 app.post('/api/notify-boss', async (req, res) => {
-  const topic = process.env.NTFY_TOPIC;
+  // Trim and strip stray surrounding quotes so a sloppy env var value still maps
+  // to the right topic (e.g. NTFY_TOPIC="my-topic" or a trailing newline/space).
+  const topic = (process.env.NTFY_TOPIC || '').trim().replace(/^["']|["']$/g, '');
   if (!topic) {
     return res.status(503).json({ error: 'Notifications not configured.' });
   }
 
   try {
-    await fetch(`https://ntfy.sh/${topic}`, {
+    const ntfyRes = await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       headers: {
         'Title': 'Customer Waiting',
@@ -586,6 +588,14 @@ app.post('/api/notify-boss', async (req, res) => {
       },
       body: 'A customer at the kiosk wants to video call. Tap to join: https://meet.jit.si/jlcustoms-expert-kiosk',
     });
+    // fetch() does not reject on HTTP error responses, so check explicitly —
+    // otherwise a rejected publish looks like success and the failure is invisible.
+    if (!ntfyRes.ok) {
+      const detail = await ntfyRes.text().catch(() => '');
+      console.error(`Notify boss: ntfy returned ${ntfyRes.status} for topic "${topic}": ${detail}`);
+      return res.status(502).json({ error: `Notification service rejected the message (${ntfyRes.status}).` });
+    }
+    console.log(`Notify boss: published to ntfy topic "${topic}"`);
     res.json({ success: true });
   } catch (err) {
     console.error('Notify boss error:', err.message);
