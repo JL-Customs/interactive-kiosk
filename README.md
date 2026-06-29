@@ -219,9 +219,9 @@ All request and response bodies are JSON unless noted. Uploaded images are serve
 | POST | `/api/send-estimate` | Email an estimate, body `{ email, items, total }` |
 | POST | `/api/send-contact` | Email the shop contact card, body `{ email }` |
 | POST | `/api/notify-boss` | Send a "customer waiting" push to staff via ntfy |
-| GET | `/api/health` | Returns `{ status: "ok", timestamp }` |
+| GET | `/api/health` | Returns `{ status: "ok", timestamp, ntfyTopic, ntfyToken }` — the last two are booleans (no secrets) so notification config can be verified on the running instance |
 
-Email routes return HTTP 503 if SMTP is not configured. The notify route returns 503 if `NTFY_TOPIC` is not set.
+Email routes return HTTP 503 if SMTP is not configured. The notify route returns 503 if `NTFY_TOPIC` is not set, and 502 if ntfy rejects the publish (for example a 429 rate-limit or daily-quota); the rejected status is logged server-side.
 
 ---
 
@@ -511,7 +511,8 @@ flowchart LR
 | `SMTP_USER` | for email | SMTP username |
 | `SMTP_PASS` | for email | SMTP password |
 | `SMTP_FROM` | no | From address (falls back to `SMTP_USER`) |
-| `NTFY_TOPIC` | for video alerts | The ntfy.sh topic that staff subscribe to |
+| `NTFY_TOPIC` | for video alerts | The ntfy.sh topic that staff subscribe to (case-sensitive, no quotes/whitespace) |
+| `NTFY_TOKEN` | recommended for video alerts | An ntfy.sh access token (`tk_…`). Without it, publishes go out anonymously and ntfy rate-limits them by the backend's shared Render IP (HTTP 429). With it, limits apply per ntfy account. |
 
 ### Electron app `.env` (build time only)
 
@@ -538,6 +539,7 @@ Every kiosk page loads this file before its own scripts, so this is the only pla
 * **Two separate Electron release repos.** The user and admin apps are independent git repositories with independent versions and release feeds. Bump and publish them separately.
 * **Placeholder contact details.** The shop phone, email, and the email templates still contain sample values such as `(555) 123-4567`, `email@email.com`, and `info@jlcustoms.com` (in `user/home.html` and `backend/server.js`). Replace these with the real details before going live.
 * **Fixed video room.** The Jitsi room is hardcoded as `jlcustoms-expert-kiosk` in `user/video-call.html` and in the ntfy alert text in the backend. Both must match for the staff link and the kiosk to land in the same room.
+* **ntfy needs an access token on shared hosting.** The backend publishes "customer waiting" alerts to `ntfy.sh/$NTFY_TOPIC`. On Render the outbound IP is shared across tenants, so anonymous publishes get rate-limited (HTTP 429) even at low volume — the symptom is "it used to work, now it doesn't" while a direct `curl` from another machine still delivers. Set `NTFY_TOKEN` to an ntfy access token so the limit is applied per ntfy account. The ntfy.sh free plan still has a daily message cap (error code `42908`) that resets daily; for production reliability use a paid plan (which also lets you reserve the topic so others cannot publish to it) or self-host ntfy. `GET /api/health` reports `ntfyTopic`/`ntfyToken` booleans to confirm the running backend sees both.
 * **Kiosk mode is off by default.** `user/main.js` creates the window with `fullscreen: false`. Set it to `true` for a deployed kiosk.
 * **No automated tests.** There is currently no test suite. Verify changes by running the apps against a local or staging backend.
 
@@ -549,7 +551,8 @@ Every kiosk page loads this file before its own scripts, so this is the only pla
 | --- | --- |
 | Kiosk shows old photos | It is serving the offline cache because the server was unreachable. Check the backend is up and reachable from the kiosk. |
 | Estimate emails do not arrive | SMTP is not configured or is rejecting. The send routes return 503 when SMTP env vars are missing. Check `SMTP_*` values and server logs. |
-| Video call button does nothing useful for staff | `NTFY_TOPIC` is not set, or staff are not subscribed to that topic in the ntfy app. |
+| Video call button does nothing useful for staff | `NTFY_TOPIC` is not set, or staff are not subscribed to that exact topic in the ntfy app (the name is case-sensitive). Confirm with `GET /api/health` (`ntfyTopic`/`ntfyToken`). |
+| Notifications stopped arriving (backend returns 502, ntfy 429) | Rate limit. Either anonymous publishes from Render's shared IP are capped — set `NTFY_TOKEN` to an ntfy access token — or the ntfy.sh free-plan daily message quota is reached (code `42908`), which resets daily. A direct `curl -H "Authorization: Bearer tk_…" -d test https://ntfy.sh/$NTFY_TOPIC` isolates token vs. backend. For headroom, upgrade the ntfy plan or self-host. |
 | Leads or photos disappeared after a deploy | The Render filesystem reset. Move storage to a persistent disk. See the gotcha above. |
 | Build options are empty for a make | No options pushed for that company. Import a CSV in the admin Manage Data tab and Save and push to server. |
 | Kiosk did not update | It checks GitHub Releases every 15 minutes. Confirm the new `version` was published and the release is not a draft. |
