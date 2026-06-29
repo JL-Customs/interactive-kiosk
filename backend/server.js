@@ -579,13 +579,21 @@ app.post('/api/notify-boss', async (req, res) => {
   }
 
   try {
+    const headers = {
+      'Title': 'Customer Waiting',
+      'Priority': 'high',
+      'Tags': 'video_camera',
+    };
+    // Authenticate so ntfy.sh rate-limits us per-account, not by source IP.
+    // Render's outbound IP is shared across tenants, so anonymous publishes get
+    // 429'd once that shared IP hits the free-tier cap. A token sidesteps that.
+    const token = (process.env.NTFY_TOKEN || '').trim();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const ntfyRes = await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
-      headers: {
-        'Title': 'Customer Waiting',
-        'Priority': 'high',
-        'Tags': 'video_camera',
-      },
+      headers,
       body: 'A customer at the kiosk wants to video call. Tap to join: https://meet.jit.si/jlcustoms-expert-kiosk',
     });
     // fetch() does not reject on HTTP error responses, so check explicitly —
