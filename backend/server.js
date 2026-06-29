@@ -197,7 +197,13 @@ loadLeads();
  * Health check endpoint
  */
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Booleans only (no secret values) so notification config can be diagnosed remotely.
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    ntfyTopic: Boolean((process.env.NTFY_TOPIC || '').trim()),
+    ntfyToken: Boolean((process.env.NTFY_TOKEN || '').trim()),
+  });
 });
 
 /**
