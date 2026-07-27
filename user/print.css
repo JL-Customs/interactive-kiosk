@@ -1,0 +1,57 @@
+/* ============================================================
+   JL Customs - print feedback toast
+   The kiosk prints silently to the default printer (no dialog);
+   this small toast is the only on-screen feedback. Styled with
+   the shared design tokens (theme.css). Hidden from the printed
+   page by the per-page @media print rule (body > * -> none).
+   ============================================================ */
+
+.print-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translate(-50%, 24px);
+  z-index: 1200; /* above the on-screen keyboard (z-index 1000) */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 90vw;
+  padding: 14px 22px;
+  background: var(--graphite);
+  color: #f4f5f7;
+  border: 1px solid var(--graphite-3);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--r);
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+}
+.print-toast.print-toast-show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.print-toast.print-toast-ok    { border-left-color: var(--ok); }
+.print-toast.print-toast-error { border-left-color: var(--danger); }
+
+/* Spinner shown while the job is being sent */
+.print-toast-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: print-spin 0.7s linear infinite;
+}
+.print-toast-icon { font-size: 1.15rem; line-height: 1; }
+
+@keyframes print-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .print-toast-spinner { animation-duration: 1.4s; }
+}

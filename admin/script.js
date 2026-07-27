@@ -195,7 +195,7 @@ async function loadPhotos() {
       allPhotos = await response.json();
       localStorage.setItem('cachedPhotos', JSON.stringify(allPhotos));
 
-      // Server is empty but local store has photos — re-upload
+      // Server is empty but local store has photos - re-upload
       if (allPhotos.length === 0 && window.localStore) {
         const localPhotos = await window.localStore.loadMetadata();
         if (localPhotos.length > 0) {
@@ -218,7 +218,7 @@ async function loadPhotos() {
     console.error('Error loading photos:', error);
   }
 
-  // Server unreachable — fall back to localStorage cache
+  // Server unreachable - fall back to localStorage cache
   loadCachedPhotosAdmin();
 }
 
@@ -309,7 +309,7 @@ async function pushLocalSettingsToServer() {
       body: JSON.stringify(settings),
     });
   } catch {
-    // server offline — silently skip, will push next time
+    // server offline - silently skip, will push next time
   }
 }
 
@@ -318,7 +318,7 @@ function loadCachedPhotosAdmin() {
   if (!raw) return;
   try {
     allPhotos = JSON.parse(raw);
-    console.warn('Server offline — showing cached photo data. Changes cannot be saved until the server is back.');
+    console.warn('Server offline - showing cached photo data. Changes cannot be saved until the server is back.');
     normalizeDisplayOrder(allPhotos);
     displayPhotos(allPhotos);
     document.getElementById('photo-count').textContent = `${allPhotos.length} (cached)`;
@@ -331,14 +331,14 @@ function loadCachedPhotosAdmin() {
 }
 
 function formatFileSize(bytes) {
-  if (!bytes) return '—';
+  if (!bytes) return '-';
   const kb = bytes / 1024;
   if (kb < 1024) return Math.round(kb) + ' KB';
   return Math.round(kb / 1024) + ' MB';
 }
 
 function formatDate(isoDate) {
-  if (!isoDate) return '—';
+  if (!isoDate) return '-';
   return new Date(isoDate).toLocaleDateString();
 }
 
@@ -419,7 +419,7 @@ async function loadSettingsFromServer() {
       document.getElementById('rotation-interval').value = interval;
     }
   } catch {
-    console.warn('Server offline — using cached settings.');
+    console.warn('Server offline - using cached settings.');
   }
 }
 
@@ -694,47 +694,130 @@ function setupCsvTab() {
   document.getElementById('export-csv-btn').addEventListener('click', exportOptionsCsv);
 }
 
-// Parse CSV text into [{ category, items }]
-// Supports:
-//   5 col: "Category, Item, Price, Requires, Part Number"
-//   4 col: "Category, Item, Price, Requires"  (Requires = pipe-separated item labels)
-//   3 col: "Category, Item, Price"
-//   2 col: "Item, Price"  (legacy → "General" category)
+// Split one CSV line into fields, honoring double-quoted values that may
+// contain commas (e.g. "Steel, Screened, White" or the "130, LR" headers)
+// and escaped quotes ("").  Returns trimmed field strings.
+function parseCsvLine(line) {
+  const fields = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; } // escaped quote
+        else inQuotes = false;
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      fields.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  fields.push(cur);
+  return fields.map(f => f.trim());
+}
+
+// Parse CSV text into [{ category, items }].
+//
+// Preferred (new) format keys off a header row and is column-order independent:
+//   Category, Item, Part Number, Price, Requires, <van cfg 1>, <van cfg 2>, …
+// Any header column that isn't one of the known names (Category / Item /
+// Part Number / Price / Requires) is treated as a van-configuration fitment
+// column; an "x" in that cell adds the header label to the item's `fits` list.
+// A blank Price is treated as 0.
+//
+// Falls back to the legacy positional parser when no Category/Item header is
+// present. Each item is { label, price, requires, partNumber, fits }.
 function parseCsvText(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const rows = text.split(/\r?\n/).filter(r => r.trim() !== '');
+  if (rows.length === 0) return [];
+
+  const header = parseCsvLine(rows[0]);
+  const lower = header.map(h => h.toLowerCase());
+  const catIdx = lower.indexOf('category');
+  const itemIdx = lower.indexOf('item');
+
+  // No recognizable header → legacy positional format.
+  if (catIdx === -1 || itemIdx === -1) return parseCsvTextLegacy(rows);
+
+  const priceIdx = lower.indexOf('price');
+  const requiresIdx = lower.indexOf('requires');
+  const partIdx = lower.findIndex(h => h.startsWith('part')); // "Part Number"
+
+  const known = new Set([catIdx, itemIdx, priceIdx, requiresIdx, partIdx].filter(i => i >= 0));
+  const fitCols = header
+    .map((label, i) => ({ label, i }))
+    .filter(c => !known.has(c.i) && c.label !== '');
+
+  const map = new Map();
+  for (let r = 1; r < rows.length; r++) {
+    const f = parseCsvLine(rows[r]);
+    const category = f[catIdx] || '';
+    const label = f[itemIdx] || '';
+    if (!category || !label) continue;
+
+    // Blank price → 0 (partition rows carry no price of their own).
+    const rawPrice = priceIdx >= 0 ? (f[priceIdx] || '') : '';
+    const price = rawPrice === '' ? 0 : parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+    if (isNaN(price)) continue;
+
+    const rawReq = requiresIdx >= 0 ? (f[requiresIdx] || '') : '';
+    const requires = rawReq ? rawReq.split('|').map(x => x.trim()).filter(Boolean) : [];
+    const partNumber = partIdx >= 0 ? (f[partIdx] || '') : '';
+    const fits = fitCols
+      .filter(c => (f[c.i] || '').toLowerCase() === 'x')
+      .map(c => c.label);
+
+    if (!map.has(category)) map.set(category, []);
+    map.get(category).push({ label, price, requires, partNumber, fits });
+  }
+
+  return Array.from(map.entries()).map(([category, items]) => ({ category, items }));
+}
+
+// Legacy positional parser (no header, or old column order):
+//   5 col: "Category, Item, Price, Requires, Part Number"
+//   4 col: "Category, Item, Price, Requires"  (Requires = pipe-separated labels)
+//   3 col: "Category, Item, Price"
+//   2 col: "Item, Price"  (→ "General" category)
+function parseCsvTextLegacy(rows) {
   const map = new Map();
 
-  for (const line of lines) {
-    const parts = line.split(',');
+  for (const row of rows) {
+    const parts = parseCsvLine(row);
 
     if (parts.length >= 3) {
-      const category = parts[0].trim().replace(/^"|"$/g, '');
+      const category = parts[0];
       if (category.toLowerCase() === 'category') continue; // skip header
 
       let label, price, requires = [], partNumber = '';
 
       if (parts.length >= 4) {
-        // 4+ col: Category, Item, Price, Requires[, Part Number]
-        label = parts[1].trim().replace(/^"|"$/g, '');
+        label = parts[1];
         price = parseFloat(parts[2].replace(/[^0-9.]/g, ''));
-        const req = parts[3].trim().replace(/^"|"$/g, '');
+        const req = parts[3];
         requires = req ? req.split('|').map(r => r.trim()).filter(Boolean) : [];
-        if (parts.length >= 5) partNumber = parts[4].trim().replace(/^"|"$/g, '');
+        if (parts.length >= 5) partNumber = parts[4];
       } else {
-        // 3-col: Category, Item, Price
-        label = parts[1].trim().replace(/^"|"$/g, '');
+        label = parts[1];
         price = parseFloat(parts[2].replace(/[^0-9.]/g, ''));
       }
 
       if (!category || !label || isNaN(price)) continue;
       if (!map.has(category)) map.set(category, []);
-      map.get(category).push({ label, price, requires, partNumber });
+      map.get(category).push({ label, price, requires, partNumber, fits: [] });
     } else if (parts.length === 2) {
-      const label = parts[0].trim().replace(/^"|"$/g, '');
+      const label = parts[0];
       const price = parseFloat(parts[1].replace(/[^0-9.]/g, ''));
       if (!label || isNaN(price)) continue;
       if (!map.has('General')) map.set('General', []);
-      map.get('General').push({ label, price, requires: [], partNumber: '' });
+      map.get('General').push({ label, price, requires: [], partNumber: '', fits: [] });
     }
   }
 
@@ -892,7 +975,7 @@ function addCategory() {
 function addItem(catIdx) {
   syncOptionsFromInputs();
   if (estimateOptions[catIdx]) {
-    estimateOptions[catIdx].items.push({ label: '', price: 0, requires: [], partNumber: '' });
+    estimateOptions[catIdx].items.push({ label: '', price: 0, requires: [], partNumber: '', fits: [] });
     renderOptionsTable();
   }
 }
@@ -1041,7 +1124,7 @@ async function saveEstimateOptions() {
     const total = valid.reduce((s, c) => s + c.items.length, 0);
     setOptionsStatus(res.ok ? `Saved ${total} item(s) for "${currentCompany}".` : 'Saved locally. Server returned an error.');
   } catch {
-    setOptionsStatus('Saved locally. Server is offline — will push on next startup.');
+    setOptionsStatus('Saved locally. Server is offline - will push on next startup.');
   }
 }
 
@@ -1279,8 +1362,11 @@ async function savePartsEdit(groupIdx) {
   const oldItemIdx = cats[oldCatIdx].items.findIndex(i => i.label === origLabel);
   if (oldItemIdx === -1) { renderPartsLibrary(); return; }
 
+  // Preserve van-fitment data, which isn't exposed in the edit row.
+  const fits = Array.isArray(cats[oldCatIdx].items[oldItemIdx].fits) ? cats[oldCatIdx].items[oldItemIdx].fits : [];
+
   if (newCategory === origCategory) {
-    cats[oldCatIdx].items[oldItemIdx] = { label: newLabel, price: newPrice, requires: newRequires, partNumber: newPartNumber };
+    cats[oldCatIdx].items[oldItemIdx] = { label: newLabel, price: newPrice, requires: newRequires, partNumber: newPartNumber, fits };
   } else {
     cats[oldCatIdx].items.splice(oldItemIdx, 1);
     if (cats[oldCatIdx].items.length === 0) cats.splice(oldCatIdx, 1);
@@ -1289,7 +1375,7 @@ async function savePartsEdit(groupIdx) {
       targetCat = { category: newCategory, items: [] };
       cats.push(targetCat);
     }
-    targetCat.items.push({ label: newLabel, price: newPrice, requires: newRequires, partNumber: newPartNumber });
+    targetCat.items.push({ label: newLabel, price: newPrice, requires: newRequires, partNumber: newPartNumber, fits });
   }
 
   await saveAllToLocalStore();
@@ -1331,7 +1417,7 @@ async function loadLeadsFromServer() {
     const data = await res.json();
     displayLeads(data);
   } catch {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#c0392b;">Could not load leads — check server connection.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#c0392b;">Could not load leads - check server connection.</td></tr>';
   }
 }
 
@@ -1351,13 +1437,13 @@ function displayLeads(leadsData) {
       hour: 'numeric', minute: '2-digit', hour12: true,
     });
     const source = lead.source === 'estimate' ? 'Estimate' : 'Contact';
-    const total = lead.total != null ? `$${Number(lead.total).toLocaleString('en-US')}` : '—';
+    const total = lead.total != null ? `$${Number(lead.total).toLocaleString('en-US')}` : '-';
     return `
       <tr>
         <td>${date}</td>
         <td>${escapeHtml(lead.name)}</td>
         <td>${escapeHtml(lead.phone)}</td>
-        <td>${lead.email ? escapeHtml(lead.email) : '—'}</td>
+        <td>${lead.email ? escapeHtml(lead.email) : '-'}</td>
         <td>${source}</td>
         <td>${total}</td>
         <td>

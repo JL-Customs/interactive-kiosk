@@ -9,6 +9,10 @@ contextBridge.exposeInMainWorld('appLog', {
   write: (msg) => ipcRenderer.invoke('log:write', msg)
 });
 
+contextBridge.exposeInMainWorld('printer', {
+  print: () => ipcRenderer.invoke('print:silent')
+});
+
 contextBridge.exposeInMainWorld('photoCache', {
   saveMetadata: (photos) => ipcRenderer.invoke('cache:save-metadata', photos),
   loadMetadata: () => ipcRenderer.invoke('cache:load-metadata'),

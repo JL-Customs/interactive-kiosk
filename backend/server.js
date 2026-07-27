@@ -545,11 +545,11 @@ app.post('/api/send-contact', express.json(), async (req, res) => {
         <table style="width:100%;border-collapse:collapse;">
           <tr>
             <td style="padding:12px;font-weight:bold;width:80px;">Phone</td>
-            <td style="padding:12px;">(555) 123-4567</td>
+            <td style="padding:12px;">(317) 417-6240</td>
           </tr>
           <tr style="background:#f5f5f5;">
             <td style="padding:12px;font-weight:bold;">Email</td>
-            <td style="padding:12px;">info@jlcustoms.com</td>
+            <td style="padding:12px;">justin@jl-customs.com</td>
           </tr>
         </table>
         <p style="margin-top:20px;color:#666;font-size:0.9rem;">
@@ -602,7 +602,7 @@ app.post('/api/notify-boss', async (req, res) => {
       headers,
       body: 'A customer at the kiosk wants to video call. Tap to join: https://meet.jit.si/jlcustoms-expert-kiosk',
     });
-    // fetch() does not reject on HTTP error responses, so check explicitly —
+    // fetch() does not reject on HTTP error responses, so check explicitly -
     // otherwise a rejected publish looks like success and the failure is invisible.
     if (!ntfyRes.ok) {
       const detail = await ntfyRes.text().catch(() => '');

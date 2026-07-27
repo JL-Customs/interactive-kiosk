@@ -6,6 +6,8 @@
   <title>JL Customs - Estimate</title>
   <script src="config.js"></script>
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="keyboard.css">
+  <link rel="stylesheet" href="print.css">
   <style>
     * {
       margin: 0;
@@ -445,25 +447,51 @@
     }
 
     @media print {
+      @page { size: 210mm auto; margin: 6mm; }
       body > * { display: none !important; }
       #print-area { display: block !important; }
     }
 
+    /* Printed estimate / receipt. Authored ~772px wide to match the A40a's
+       1632-dot, 203-dpi panel after the render pipeline scales it up (Pi),
+       and to fit the system printer's page (Windows). */
     #print-area {
       display: none;
-      font-family: sans-serif;
+      background: #fff;
       color: #000;
-      padding: 40px;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: none;
+      padding: 34px 40px 44px;
+      box-sizing: border-box;
     }
-
-    #print-area h1 { font-size: 1.6rem; margin-bottom: 8px; }
-    #print-area .print-date { color: #666; margin-bottom: 24px; font-size: 0.9rem; }
-    #print-area table { width: 100%; border-collapse: collapse; }
-    #print-area th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #000; }
-    #print-area td { padding: 8px 12px; border-bottom: 1px solid #ccc; }
-    #print-area td:last-child, #print-area th:last-child { text-align: right; }
-    #print-area .print-total { font-weight: bold; font-size: 1.1rem; }
-    #print-area .print-sub { color: #555; font-size: 1rem; margin-bottom: 12px; }
+    #print-area * { margin: 0; padding: 0; box-sizing: border-box; }
+    #print-area .r-brand { text-align: center; margin-bottom: 6px; }
+    #print-area .r-brand img { width: 300px; height: auto; display: inline-block; }
+    #print-area .r-tagline { text-align: center; font-size: 13px; letter-spacing: 3px; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+    #print-area .r-rule { border: none; border-top: 3px solid #000; margin: 20px 0; }
+    #print-area .r-rule-thin { border: none; border-top: 1px solid #000; margin: 14px 0; }
+    #print-area .r-title { text-align: center; font-size: 30px; font-weight: 800; letter-spacing: 10px; text-indent: 10px; margin: 4px 0 18px; }
+    #print-area .r-meta { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 4px; }
+    #print-area .r-meta .r-label { font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
+    #print-area .r-meta .r-val { font-weight: 700; }
+    #print-area .r-block-label { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin: 4px 0 6px; }
+    #print-area .r-cust-name { font-size: 20px; font-weight: 800; line-height: 1.2; }
+    #print-area .r-cust-line { font-size: 15px; margin-top: 2px; }
+    #print-area table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    #print-area thead th { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; text-align: left; padding: 6px 0; border-bottom: 2px solid #000; }
+    #print-area thead th.r-num { text-align: right; }
+    #print-area tbody td { font-size: 16px; padding: 11px 0; border-bottom: 1px solid #000; vertical-align: top; }
+    #print-area tbody td.r-item { font-weight: 700; padding-right: 12px; }
+    #print-area tbody td.r-part { font-size: 13px; white-space: nowrap; padding-right: 12px; font-family: "Courier New", monospace; letter-spacing: -0.3px; }
+    #print-area tbody td.r-price { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #print-area .r-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; padding-top: 14px; border-top: 3px solid #000; }
+    #print-area .r-total .r-t-label { font-size: 17px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    #print-area .r-total .r-t-val { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #print-area .r-foot { margin-top: 26px; text-align: center; font-size: 13px; line-height: 1.7; }
+    #print-area .r-foot .r-disc { font-weight: 700; }
+    #print-area .r-foot .r-thanks { font-size: 17px; font-weight: 800; letter-spacing: 1px; margin: 14px 0 8px; }
+    #print-area .r-foot .r-contact { font-size: 14px; }
+    #print-area .r-tear { margin-top: 22px; border-top: 2px dashed #000; padding-top: 8px; text-align: center; font-size: 11px; letter-spacing: 4px; }
   </style>
 </head>
 <body>
@@ -550,15 +578,203 @@
 
     const fmt = (n) => '$' + n.toLocaleString('en-US');
 
+    // Branding printed on the estimate. Update RECEIPT_CONTACT with the shop's
+    // real phone / site (kept as placeholders to match the rest of the app).
+    const RECEIPT_TAGLINE = 'Commercial Vehicle Upfitting';
+    const RECEIPT_CONTACT = '(317) 417-6240 &bull; jl-customs.com';
+
     // secondary item wrappers: label → element
     const secondaryElements = new Map();
+
+    // ── Config gating (wheelbase + roof → fitment) ──────────────
+    // Activated when the loaded data carries `fits` tokens (e.g. "130, LR").
+    // The first two steps become Wheelbase then Roof; parts then populate
+    // based on which vehicle config they fit.
+    let configMode = false;
+    let partWrappers = [];   // every part option wrapper (each carries data-fits)
+    let roofWrappers = [];   // roof radio wrappers (filtered per wheelbase)
+    let roofsByWb = {};      // wheelbase → [roof codes] that exist for it
+
+    const ROOF_NAMES = { LR: 'Low Roof', MR: 'Medium Roof', HR: 'High Roof' };
+    const ROOF_ORDER = ['LR', 'MR', 'HR'];
+    const roofLabel = (code) => ROOF_NAMES[code] || code;
+    const wbLabel = (wb) => /^\d+$/.test(wb) ? `${wb}"` : wb;
+
+    function parseConfigToken(tok) {
+      const i = String(tok).indexOf(',');
+      if (i === -1) return { wb: String(tok).trim(), roof: '' };
+      return { wb: tok.slice(0, i).trim(), roof: tok.slice(i + 1).trim() };
+    }
+
+    function makeSection(title) {
+      const section = document.createElement('div');
+      section.className = 'category-section';
+      const heading = document.createElement('div');
+      heading.className = 'category-heading';
+      heading.textContent = title;
+      section.appendChild(heading);
+      return section;
+    }
+
+    function createConfigOption(groupName, kind, value, labelText, idx) {
+      const id = `${kind}-${idx}`;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'option-wrapper';
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.htmlFor = id;
+      label.innerHTML = `
+        <input type="radio" name="${groupName}" id="${id}" data-config="1" data-${kind}="${value}">
+        <span class="option-label">${labelText}</span>
+      `;
+      label.querySelector('input').addEventListener('change', updateVisibility);
+      wrapper.appendChild(label);
+      return wrapper;
+    }
+
+    function createPartElement(item, idx, inputType, groupName) {
+      const id = `opt-${idx}`;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'option-wrapper';
+      wrapper.dataset.fits = JSON.stringify(Array.isArray(item.fits) ? item.fits : []);
+      wrapper.style.display = 'none';
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.htmlFor = id;
+      const nameAttr = groupName ? `name="${groupName}"` : '';
+      label.innerHTML = `
+        <input type="${inputType}" ${nameAttr} id="${id}" data-price="${item.price}" data-label="${item.label}" data-part-number="${item.partNumber || ''}">
+        <span class="option-label">
+          ${item.label}
+          ${item.partNumber ? `<span class="option-part-number">Part #: ${item.partNumber}</span>` : ''}
+        </span>
+        <span class="option-price">${fmt(item.price)}</span>
+      `;
+      label.addEventListener('change', updateTotal);
+      wrapper.appendChild(label);
+      partWrappers.push(wrapper);
+      return wrapper;
+    }
+
+    function buildConfigModeOptions(data, list) {
+      // Gather the valid wheelbase/roof combinations from every item's fits.
+      const combos = [];
+      const seen = new Set();
+      data.forEach(cat => (cat.items || []).forEach(it => (it.fits || []).forEach(tok => {
+        if (seen.has(tok)) return;
+        seen.add(tok);
+        combos.push(parseConfigToken(tok));
+      })));
+
+      const wheelbases = [];
+      const allRoofs = [];
+      roofsByWb = {};
+      combos.forEach(c => {
+        if (!wheelbases.includes(c.wb)) wheelbases.push(c.wb);
+        roofsByWb[c.wb] = roofsByWb[c.wb] || [];
+        if (!roofsByWb[c.wb].includes(c.roof)) roofsByWb[c.wb].push(c.roof);
+        if (!allRoofs.includes(c.roof)) allRoofs.push(c.roof);
+      });
+      const rank = (r) => { const i = ROOF_ORDER.indexOf(r); return i === -1 ? 999 : i; };
+      allRoofs.sort((a, b) => rank(a) - rank(b));
+      Object.values(roofsByWb).forEach(rs => rs.sort((a, b) => rank(a) - rank(b)));
+
+      // Step 1 - Wheelbase
+      const wbSection = makeSection('Wheelbase');
+      wheelbases.forEach((wb, i) => wbSection.appendChild(createConfigOption('wb-choice', 'wb', wb, wbLabel(wb), i)));
+      list.appendChild(wbSection);
+
+      // Step 2 - Roof (hidden until a wheelbase is chosen; options filtered to fit it)
+      const roofSection = makeSection('Roof');
+      roofSection.classList.add('config-roof-section');
+      roofSection.style.display = 'none';
+      allRoofs.forEach((roof, i) => {
+        const w = createConfigOption('roof-choice', 'roof', roof, roofLabel(roof), i);
+        w.dataset.roof = roof;
+        roofWrappers.push(w);
+        roofSection.appendChild(w);
+      });
+      list.appendChild(roofSection);
+
+      // Parts - hidden until both wheelbase and roof are chosen
+      data.forEach((cat, catIdx) => {
+        const section = makeSection(cat.category);
+        section.classList.add('part-section');
+        section.style.display = 'none';
+        const isSingle = (cat.type || 'multiple') === 'single';
+        cat.items.forEach((item, i) => {
+          const idx = catIdx * 1000 + i;
+          const inputType = isSingle ? 'radio' : 'checkbox';
+          const groupName = isSingle ? `cat-single-${catIdx}` : null;
+          section.appendChild(createPartElement(item, idx, inputType, groupName));
+        });
+        list.appendChild(section);
+      });
+    }
+
+    function updateConfigVisibility() {
+      const wbInput = document.querySelector('input[name="wb-choice"]:checked');
+      const wb = wbInput ? wbInput.dataset.wb : null;
+
+      const roofSection = document.querySelector('.config-roof-section');
+      if (roofSection) roofSection.style.display = wb ? '' : 'none';
+
+      // Only offer roofs that exist for the chosen wheelbase.
+      const validRoofs = wb ? (roofsByWb[wb] || []) : [];
+      roofWrappers.forEach(w => {
+        const ok = wb && validRoofs.includes(w.dataset.roof);
+        const input = w.querySelector('input');
+        if (!ok) {
+          if (input && input.checked) input.checked = false;
+          w.style.display = 'none';
+        } else {
+          w.style.display = '';
+        }
+      });
+
+      const roofInput = document.querySelector('input[name="roof-choice"]:checked');
+      const roof = roofInput ? roofInput.dataset.roof : null;
+      const ready = Boolean(wb && roof);
+      const key = ready ? `${wb}, ${roof}` : null;
+
+      // Show a part if the vehicle is fully specified and the part either fits
+      // this exact config or is universal (no fitment restriction).
+      partWrappers.forEach(w => {
+        const fits = JSON.parse(w.dataset.fits || '[]');
+        const visible = ready && (fits.length === 0 || fits.includes(key));
+        const input = w.querySelector('input');
+        if (!visible) {
+          if (input && input.checked) input.checked = false;
+          w.style.display = 'none';
+        } else {
+          w.style.display = '';
+        }
+      });
+
+      // Hide part categories that ended up with nothing to show.
+      document.querySelectorAll('.part-section').forEach(sec => {
+        if (!ready) { sec.style.display = 'none'; return; }
+        const anyVisible = [...sec.querySelectorAll('.option-wrapper')].some(w => w.style.display !== 'none');
+        sec.style.display = anyVisible ? '' : 'none';
+      });
+
+      updateTotal();
+    }
 
     function buildOptions(data) {
       const list = document.getElementById('options-list');
       list.innerHTML = '';
       secondaryElements.clear();
+      partWrappers = [];
+      roofWrappers = [];
 
       const isHierarchical = data.length > 0 && data[0].category !== undefined;
+      configMode = isHierarchical && data.some(cat => (cat.items || []).some(it => Array.isArray(it.fits) && it.fits.length > 0));
+
+      if (configMode) {
+        buildConfigModeOptions(data, list);
+        return;
+      }
 
       if (isHierarchical) {
         data.forEach((cat, catIdx) => {
@@ -593,7 +809,7 @@
           list.appendChild(section);
         });
       } else {
-        // flat data — all checkboxes, no primary gating
+        // flat data - all checkboxes, no primary gating
         data.forEach((item, i) => list.appendChild(createSecondaryElement(item, i)));
       }
     }
@@ -656,6 +872,7 @@
     }
 
     function updateVisibility() {
+      if (configMode) { updateConfigVisibility(); return; }
       const hasPrimaryGating = document.querySelector('input[name="primary-choice"]') !== null;
       const radio = getSelectedPrimary();
       const selectedLabel = radio ? radio.dataset.label : null;
@@ -711,7 +928,7 @@
         updateVisibility();
       } else {
         document.getElementById('options-list').innerHTML =
-          '<p style="color:var(--steel);text-align:center;padding:48px 0;font-size:1.05rem;line-height:1.6;">No build options are available for this vehicle yet.<br>Head back and contact an expert — we’ll help you spec it out.</p>';
+          '<p style="color:var(--steel);text-align:center;padding:48px 0;font-size:1.05rem;line-height:1.6;">No build options are available for this vehicle yet.<br>Head back and contact an expert - we’ll help you spec it out.</p>';
       }
     }
 
@@ -721,7 +938,8 @@
       const results = [];
       results.push(...document.querySelectorAll('input[type="radio"]:checked'));
       results.push(...document.querySelectorAll('input[type="checkbox"]:checked'));
-      return results;
+      // Exclude the wheelbase/roof config selectors - they gate parts but aren't line items.
+      return results.filter(i => !i.dataset.config);
     }
 
     function updateTotal() {
@@ -804,29 +1022,62 @@
     document.getElementById('btn-print').addEventListener('click', () => {
       const checked = getChecked();
       const total = checked.reduce((sum, cb) => sum + Number(cb.dataset.price), 0);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
       const rows = checked.map((cb) => {
         const label = cb.dataset.label || '';
         const partNumber = cb.dataset.partNumber || '';
-        return `<tr><td>${label}</td><td>${partNumber}</td><td>$${Number(cb.dataset.price).toLocaleString('en-US')}</td></tr>`;
+        const partCell = partNumber ? esc(partNumber) : '-';
+        return `<tr><td class="r-item">${esc(label)}</td><td class="r-part">${partCell}</td><td class="r-price">${fmt(Number(cb.dataset.price))}</td></tr>`;
       }).join('');
 
       const name = document.getElementById('name-input').value.trim();
       const phone = document.getElementById('phone-input').value.trim();
-      const customerLine = (name || phone)
-        ? `<div class="print-sub">${[name, phone].filter(Boolean).join(' • ')}</div>`
+
+      // Vehicle (wheelbase + roof) is known on this page in config mode.
+      const wbInput = document.querySelector('input[name="wb-choice"]:checked');
+      const roofInput = document.querySelector('input[name="roof-choice"]:checked');
+      const vehicle = (wbInput && roofInput)
+        ? `${wbLabel(wbInput.dataset.wb)} - ${roofLabel(roofInput.dataset.roof)}`
         : '';
+
+      const custLines = [];
+      if (name) custLines.push(`<div class="r-cust-name">${esc(name)}</div>`);
+      if (phone) custLines.push(`<div class="r-cust-line">${esc(phone)}</div>`);
+      if (vehicle) custLines.push(`<div class="r-cust-line">${esc(vehicle)}</div>`);
+      const preparedFor = custLines.length
+        ? `<div class="r-block-label">Prepared For</div>${custLines.join('')}`
+        : '';
+
+      const estNo = 'A40-' + (1000 + Math.floor(Math.random() * 9000));
+      const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
       document.getElementById('print-area').innerHTML = `
-        <h1>JL Customs — Estimate</h1>
-        <div class="print-date">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-        ${customerLine}
+        <div class="r-brand"><img src="logo.png" alt="JL Customs"></div>
+        <div class="r-tagline">${RECEIPT_TAGLINE}</div>
+        <hr class="r-rule">
+        <div class="r-title">ESTIMATE</div>
+        <div class="r-meta">
+          <span><span class="r-label">Estimate #&nbsp;</span><span class="r-val">${estNo}</span></span>
+          <span><span class="r-label">Date&nbsp;</span><span class="r-val">${dateStr}</span></span>
+        </div>
+        <hr class="r-rule-thin">
+        ${preparedFor}
         <table>
-          <thead><tr><th>Item</th><th>Part #</th><th>Price</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="3">No items selected</td></tr>'}</tbody>
-          <tfoot><tr><td class="print-total" colspan="2">Estimated Total</td><td class="print-total">$${total.toLocaleString('en-US')}</td></tr></tfoot>
+          <thead><tr><th class="r-item">Item</th><th class="r-part">Part #</th><th class="r-num">Price</th></tr></thead>
+          <tbody>${rows || '<tr><td class="r-item" colspan="3">No items selected</td></tr>'}</tbody>
         </table>
+        <div class="r-total"><span class="r-t-label">Estimated Total</span><span class="r-t-val">${fmt(total)}</span></div>
+        <div class="r-foot">
+          <div class="r-disc">This is an estimate, not a final invoice.</div>
+          <div>Pricing valid for 30 days. Final quote confirmed at drop-off.</div>
+          <div class="r-thanks">Thank you for choosing JL Customs</div>
+          <div class="r-contact">${RECEIPT_CONTACT}</div>
+        </div>
+        <div class="r-tear">- - - - -</div>
       `;
       closeModal();
-      window.print();
+      window.kioskPrint();
     });
     document.getElementById('btn-back-step').addEventListener('click', () => showStep('review'));
     document.getElementById('btn-done').addEventListener('click', closeModal);
@@ -927,5 +1178,8 @@
 
     resetTimer();
   </script>
+
+  <script src="keyboard.js"></script>
+  <script src="print.js"></script>
 </body>
 </html>

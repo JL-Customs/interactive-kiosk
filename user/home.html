@@ -6,6 +6,8 @@
   <title>JL Customs - Home</title>
   <script src="config.js"></script>
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="keyboard.css">
+  <link rel="stylesheet" href="print.css">
   <style>
     * {
       margin: 0;
@@ -303,20 +305,40 @@
     .confirm-msg { font-size: 1.1rem; color: var(--steel); line-height: 1.6; }
 
     @media print {
+      @page { size: 210mm auto; margin: 6mm; }
       body > * { display: none !important; }
       #contact-print-area { display: block !important; }
     }
 
+    /* Printed contact card. Same design language as the estimate receipt;
+       authored ~772px wide to match the A40a's 1632-dot / 203-dpi panel. */
     #contact-print-area {
       display: none;
-      font-family: sans-serif;
+      background: #fff;
       color: #000;
-      padding: 40px;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-font-smoothing: none;
+      padding: 34px 40px 44px;
+      box-sizing: border-box;
     }
-    #contact-print-area h1 { font-size: 1.6rem; margin-bottom: 4px; }
-    #contact-print-area .print-sub { color: #555; font-size: 1rem; margin-bottom: 28px; }
-    #contact-print-area .print-row { font-size: 1.1rem; margin-bottom: 12px; }
-    #contact-print-area .print-row span { font-weight: bold; }
+    #contact-print-area * { margin: 0; padding: 0; box-sizing: border-box; }
+    #contact-print-area .c-brand { text-align: center; margin-bottom: 6px; }
+    #contact-print-area .c-brand img { width: 300px; height: auto; display: inline-block; }
+    #contact-print-area .c-tagline { text-align: center; font-size: 13px; letter-spacing: 3px; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+    #contact-print-area .c-rule { border: none; border-top: 3px solid #000; margin: 20px 0; }
+    #contact-print-area .c-rule-thin { border: none; border-top: 1px solid #000; margin: 22px 0; }
+    #contact-print-area .c-title { text-align: center; font-size: 26px; font-weight: 800; letter-spacing: 6px; text-indent: 6px; margin: 4px 0 12px; }
+    #contact-print-area .c-intro { text-align: center; font-size: 15px; line-height: 1.5; margin: 0 auto 8px; max-width: 560px; }
+    #contact-print-area .c-cust { text-align: center; font-size: 14px; margin-top: 14px; }
+    #contact-print-area .c-cust .c-cust-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 2px; }
+    #contact-print-area .c-cust .c-cust-val { font-weight: 700; }
+    #contact-print-area .c-rows { margin: 26px 0 4px; }
+    #contact-print-area .c-row { text-align: center; margin: 18px 0; }
+    #contact-print-area .c-label { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; }
+    #contact-print-area .c-value { font-size: 24px; font-weight: 800; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    #contact-print-area .c-foot { margin-top: 20px; text-align: center; }
+    #contact-print-area .c-foot .c-thanks { font-size: 17px; font-weight: 800; letter-spacing: 1px; }
+    #contact-print-area .c-tear { margin-top: 22px; border-top: 2px dashed #000; padding-top: 8px; text-align: center; font-size: 11px; letter-spacing: 4px; }
   </style>
 </head>
 <body>
@@ -362,14 +384,14 @@
             <span class="contact-icon">&#128222;</span>
             <div>
               <div class="contact-label">Phone</div>
-              <div class="contact-value">(555) 123-4567</div>
+              <div class="contact-value">(317) 417-6240</div>
             </div>
           </div>
           <div class="contact-row">
             <span class="contact-icon">&#9993;</span>
             <div>
               <div class="contact-label">Email</div>
-              <div class="contact-value">email@email.com</div>
+              <div class="contact-value">justin@jl-customs.com</div>
             </div>
           </div>
         </div>
@@ -462,18 +484,29 @@
     function printContactInfo() {
       const name = document.getElementById('contact-name-input').value.trim();
       const phone = document.getElementById('contact-phone-input').value.trim();
-      const customerLine = (name || phone)
-        ? `<div class="print-row">Customer: <span>${[name, phone].filter(Boolean).join(' • ')}</span></div>`
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const custParts = [name, phone].filter(Boolean).map(esc).join(' &bull; ');
+      const customerBlock = custParts
+        ? `<div class="c-cust"><span class="c-cust-label">Prepared For</span><span class="c-cust-val">${custParts}</span></div>`
         : '';
       document.getElementById('contact-print-area').innerHTML = `
-        <h1>JL Customs</h1>
-        <div class="print-sub">Contact an Expert</div>
-        ${customerLine}
-        <div class="print-row">Phone: <span>(555) 123-4567</span></div>
-        <div class="print-row">Email: <span>info@jlcustoms.com</span></div>
+        <div class="c-brand"><img src="logo.png" alt="JL Customs"></div>
+        <div class="c-tagline">Commercial Vehicle Upfitting</div>
+        <hr class="c-rule">
+        <div class="c-title">CONTACT AN EXPERT</div>
+        <div class="c-intro">Speak directly with one of our experts - we're happy to help with your build.</div>
+        ${customerBlock}
+        <div class="c-rows">
+          <div class="c-row"><div class="c-label">Phone</div><div class="c-value">(317) 417-6240</div></div>
+          <div class="c-row"><div class="c-label">Email</div><div class="c-value">justin@jl-customs.com</div></div>
+          <div class="c-row"><div class="c-label">Web</div><div class="c-value">jl-customs.com</div></div>
+        </div>
+        <hr class="c-rule-thin">
+        <div class="c-foot"><div class="c-thanks">We look forward to hearing from you</div></div>
+        <div class="c-tear">- - - - -</div>
       `;
       closeContactModal();
-      window.print();
+      window.kioskPrint();
     }
 
     async function sendContactEmail() {
@@ -567,5 +600,8 @@
 
     resetTimer();
   </script>
+
+  <script src="keyboard.js"></script>
+  <script src="print.js"></script>
 </body>
 </html>

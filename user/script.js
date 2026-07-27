@@ -98,7 +98,7 @@ async function loadPhotos() {
       return photos;
     }
   } catch (error) {
-    window.appLog?.write(`Server: unreachable — showing cached photos (${error.message})`);
+    window.appLog?.write(`Server: unreachable - showing cached photos (${error.message})`);
   }
 }
 
@@ -124,7 +124,7 @@ async function loadCachedPhotos() {
   try {
     const cached = await window.photoCache.loadMetadata();
     if (!cached || cached.length === 0) {
-      window.appLog?.write('Cache: no metadata found — starting blank');
+      window.appLog?.write('Cache: no metadata found - starting blank');
       return [];
     }
     window.appLog?.write(`Cache: loaded metadata for ${cached.length} photo(s)`);
@@ -138,7 +138,7 @@ async function loadCachedPhotos() {
           if (photo.filename) {
             const localUrl = await window.photoCache.getLocalPath(photo.filename);
             if (localUrl) { localHits++; return { ...photo, url: localUrl }; }
-            window.appLog?.write(`Cache: missing local file for ${photo.filename} — will use remote`);
+            window.appLog?.write(`Cache: missing local file for ${photo.filename} - will use remote`);
           }
           return photo;
         })
@@ -171,7 +171,7 @@ async function loadRemoteSettings() {
       resetAutoPlay();
     }
   } catch {
-    console.warn('Server offline — using cached rotation interval.');
+    console.warn('Server offline - using cached rotation interval.');
   }
 }
 
@@ -230,7 +230,7 @@ async function refreshEstimateCache() {
     }
     window.appLog?.write(`EstimateCache: refreshed ${Object.keys(all).length} company/companies`);
   } catch (err) {
-    window.appLog?.write(`EstimateCache: refresh failed — ${err.message}`);
+    window.appLog?.write(`EstimateCache: refresh failed - ${err.message}`);
   }
 }
 

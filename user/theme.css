@@ -1,5 +1,5 @@
 /* ============================================================
-   JL Customs — shared design system
+   JL Customs - shared design system
    One language for every kiosk screen: graphite + brand red on
    warm paper, set in the Archivo superfamily (self-hosted so it
    works offline). Layouts live in each page; this file owns the
@@ -29,7 +29,7 @@
 }
 
 :root {
-  /* Surfaces — warm "paint booth" neutrals, not dead gray */
+  /* Surfaces - warm "paint booth" neutrals, not dead gray */
   --paper:        #f3f1ec;
   --surface:      #ffffff;
   --surface-2:    #faf8f4;
@@ -43,12 +43,12 @@
   --line:         #e7e3db;
   --line-strong:  #d8d3c9;
 
-  /* Graphite — dark structural surfaces & showcase pages */
+  /* Graphite - dark structural surfaces & showcase pages */
   --graphite:     #16181c;
   --graphite-2:   #20242a;
   --graphite-3:   #2c313a;
 
-  /* Brand red — pulled from the logo signature */
+  /* Brand red - pulled from the logo signature */
   --brand:        #d12d2b;
   --brand-strong: #ad211f;
   --brand-deep:   #8c1a18;

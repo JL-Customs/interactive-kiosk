@@ -22,7 +22,7 @@ autoUpdater.on('checking-for-update',   () => log('Checking for update...'));
 autoUpdater.on('update-available',      (i) => log(`Update available: v${i.version}`));
 autoUpdater.on('update-not-available',  (i) => log(`Up to date: v${i.version}`));
 autoUpdater.on('download-progress',     (p) => log(`Downloading: ${Math.round(p.percent)}%`));
-autoUpdater.on('update-downloaded',     (i) => { log(`Update downloaded: v${i.version} — installing`); autoUpdater.quitAndInstall(true, true); });
+autoUpdater.on('update-downloaded',     (i) => { log(`Update downloaded: v${i.version} - installing`); autoUpdater.quitAndInstall(true, true); });
 autoUpdater.on('error',                 (e) => log(`Updater error: ${e.message}`));
 
 function setupCache() {
@@ -70,6 +70,20 @@ ipcMain.handle('window:get-fullscreen', () => {
   return mainWindow.isFullScreen();
 });
 
+// Silent print to the system default printer - no Chromium print dialog.
+// The page's own @media print CSS isolates the off-screen print-area, so the
+// output matches what the old window.print() produced, minus the dialog.
+ipcMain.handle('print:silent', () => new Promise((resolve) => {
+  if (!mainWindow) return resolve({ success: false, error: 'no window' });
+  mainWindow.webContents.print(
+    { silent: true, printBackground: false, margins: { marginType: 'default' } },
+    (success, failureReason) => {
+      if (!success) log(`print failed: ${failureReason}`);
+      resolve({ success, error: success ? null : failureReason });
+    }
+  );
+}));
+
 ipcMain.handle('cache:save-metadata', (event, photos) => {
   const metadataPath = path.join(cacheDir, 'metadata.json');
   fs.writeFileSync(metadataPath, JSON.stringify(photos, null, 2));
@@ -115,7 +129,7 @@ ipcMain.handle('cache:get-local-path', (event, filename) => {
 
 app.on('ready', () => {
   logPath = path.join(app.getPath('userData'), 'updater.log');
-  log(`App started — version ${app.getVersion()}`);
+  log(`App started - version ${app.getVersion()}`);
   setupCache();
   Menu.setApplicationMenu(null);
 

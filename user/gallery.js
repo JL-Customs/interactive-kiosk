@@ -61,7 +61,7 @@ function renderGrid() {
   if (photos.length === 0) {
     const msg = document.createElement('p');
     msg.className = 'no-photos';
-    msg.textContent = 'No photos to show yet — check back soon.';
+    msg.textContent = 'No photos to show yet - check back soon.';
     grid.appendChild(msg);
     return;
   }
